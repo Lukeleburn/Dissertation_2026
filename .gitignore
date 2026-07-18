@@ -1,0 +1,13 @@
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+.quarto/
+_freeze/
+*_files/
+
+chapters/*.html
+chapters/*.pdf
+chapters/*.docx
+outputs/*
+!outputs/.gitkeep
