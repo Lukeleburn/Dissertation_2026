@@ -1,0 +1,103 @@
+---
+title: "Forschungsleitende Annahmen"
+author: "Lukas Brenner"
+lang: de
+editor: visual
+---
+
+## Zur Formulierung prüfbarer Erwartungen {#sec-06-1}
+
+Eigentlich liegt die Kunst der Formulierung überprüfbarer Erwartungen in einer wissenschaftlichen Arbeit darin, Fragen in Thesen umzuwandeln. Das Ergebnis ist das, was gemeinhin als »Hypothese« bezeichnet wird[^06_1]. In der Sprache wissenschaftlicher Methodologie ist eine Hypothese (H) eine vorläufige, begründete und empirisch prüfbare Antwort auf eine Forschungsfrage [@thompson2023, p. 3]. Diese Eigenschaften befähigen die Hypothese dazu, das Vorgehen einer wissenschaftlichen Untersuchung zu steuern[^06_2]. So beschrieben kann der Prozess der Hypothesenbildung schnell den Anschein einer rein semantischen Operation annehmen. Hält man sich jedoch an bestimmte Empfehlung bei dieser semantischen Operation - also der Übersetzung von Fragen in Thesen -, so kann dieser Erkenntnisse offenlegen, die sich zuvor noch hinter der Frage versteckt hielten.
+
+[^06_1]: Fragen nach dem Ursprung, der Entwicklung und der Art, wie Hypothesen heutzutage in wissenschaftlichen Arbeiten verwendet werden, stellen wissenschaftssoziologische Fragen für sich dar. An dieser Stelle sei auf einen Artikel von @cowles2017 verwiesen, der etwa historisch rekonstruiert, wie sich die Verwendung und Anerkennung der Hypothese als Methode durch die Untersuchungen von Charles Darwin zur Evolutionstheorie verändert hat. Für eine Kritik an der »Hypothese« und eine Verteidigung der »Frage« als primäres Mittel zur Strukturierung von (experimenteller) Forschung siehe @glass2010.
+
+[^06_2]: Karl Popper beginnt *The Logic of Scientific Discovery* [@popper1972] mit folgender Analogie zur Hypothese durch Novalis, die sich passend zur Eigenschaft der »Steuerung« lesen lässt: »Hypotheses are nets: only he who casts will catch.« [Novalis, zitiert nach @popper1972, p. 11].
+
+Eine erste Empfehlung, die einen reflektierten Prozess der Übersetzung von Frage in These leitet, findet sich bei @gustafsson2018, die schreiben, dass ein »Forschungsproblem« dann rätselhafter wird - und damit meinen die Autoren gleichzeitig *besser* -, wenn nicht nur die Frage gestellt wird, warum etwas geschehen sollte, sondern auch, warum es möglicherweise gerade nicht so zusammenhängt, wie es ursprünglich gedacht wurde. Entscheidend ist also immer auch die Gegenfrage: Warum nicht X? [vgl. ibid., p. 640]. Diese Gegenfrage eröffnet den Blick darauf, darüber nachzudenken, ob es gute Gründe dafür gibt, eine hypothetische Verbindung in einem untersuchten Phänomenen in Zweifel zu ziehen. Im Prinzip ist diese Empfehlung ähnlich zum »Falsifikationsprinzip« zu verstehen, wie es von @popper1972 formuliert wurde. Popper schreibt: »(…) we shall say that [all the statements of empirical science] must be ‚*conclusively decidable*'. This means that their form must be such that *to verify them and to falsify them* must both be logically possible.« (Ibid., p. 40, Hervorhebung im Original). Im Sinne Poppers gilt es also, die Bedingungen zu benennen, unter denen sich die Annahmen auch als falsch erweisen könnten.
+
+Werden die Forschungsfragen, die dieser Arbeit zugrunde liegen, in begründete und empirisch überprüfbare Annahmen überführt, ergeben sich drei forschungsleitende Thesen: (1) Erstens wird angenommen, dass sich populistische, pragmatische und exklusionistische Perspektiven auf Demokratie in allen Fällen empirisch voneinander differenzieren lassen (*Differenzierungsthese*). (2) Zweitens wird erwartet, dass diese Perspektiven je nach politischem Kontext unterschiedlich nuanciert sind und sich daher in den Fällen zu teilweise unterschiedlichen latenten Demokratieprofilen verbinden (*Nuancierungsthese*). (3) Drittens wird angenommen, dass Demokratieprofile, die sich zwischen Fällen ähneln, auch ähnliche soziale Grundlagen und politische Implikationen aufweisen (*Ähnlichkeitsthese*). Diese Thesen sind noch keine Hypothesen im engeren Sinne, sondern bündeln die theoretische Erwartungsrichtung der Arbeit. Erst durch ihre Konfrontation mit der Gegenfrage werden sie so präzisiert, dass aus ihnen empirisch prüfbare Hypothesen abgeleitet werden können. Die Gegenfragen, die in den folgenden Abschnitten bearbeitet werden, lauten entsprechend wie folgt:
+
+\vspace{0.8em}
+
+\begin{center}
+\begin{minipage}{0.82\textwidth}
+
+\textbf{1a} Warum sollten sich die drei Perspektiven auf Demokratie \textit{nicht} voneinander unterscheiden lassen?
+
+\vspace{0.55em}
+
+\textbf{2a} Warum sollten die Demokratieprofile \textit{keine} unterschiedlichen Gestalten zwischen den Fällen aufweisen?
+
+\vspace{0.55em}
+
+\textbf{3a} Warum sollten ähnliche Demokratieprofile \textit{keine} ähnlichen sozialen Grundlagen und politische Implikationen über Fälle hinweg aufweisen?
+
+\end{minipage}
+\end{center}
+
+\vspace{0.8em}
+
+## Die *Differenzierungsthese* {#sec-06-diffT}
+
+In Kaptitel 3 [@sec-03-begriffe] wurde das Argument gemacht, dass die Rahmung der Untersuchung mit dem Begriff des »populistischen Zeitgeists« verstanden werden sollte, sofern dieser weiter gefasst wird als die bloße Verbreitung populistischer Politik. Besser lässt er sich als eine bis heute fortwirkende politische Erfahrung fassen, in der grundlegende Fragen der Demokratie neu zugespitzt wurden. Der Populismus hat dabei selbst zu einer Veränderung im Verständnis von Demokratie beigetragen[^06_3] und zugleich hat er alternative und konkurrierende Demokratieverständnisse provoziert und sichtbarer gemacht. Die *Differenzierungsthese* postuliert in diesem Sinne, dass sich die populistische, die pragmatische und die exklusionistische Perspektive auf Demokratie in allen Fällen jeweils als voneinander unterscheidbare Einstellungsdimensionen validieren lassen sollten, da sie allesamt zum Phänomen des populistischen Zeitgeists zugehören.
+
+[^06_3]: Viele würden wahrscheinlich sagen, dass dies auf Grund des reduktionistischen Charakters der populistischen Demokratieauffassung und seiner Tendenz zur Präferenz einfacher Lösungen für komplexe Probleme zum Schlechteren geschieht. Es lohnt sich aber basal darauf zu verweisen, dass es Forschung gibt, die darauf verweist, dass er politischer Partizipation [siehe @huber2025a] und Wahlbeteiligung [@huber2017] in westlichen Demokratien in den letzten Jahren erhöht hat.
+
+Berücksichtigen wir nun die Gegenfrage, muss eine Antwort darauf gegeben werden, warum dies *nicht* der Fall sein könnte. Diese Gegenfrage ist an dieser Stelle wichtig, weil sie zwei argumentative Rechtfertigungen verlangt, die nicht trivial sind. Erstens sollte sich plausibel erklären lassen, dass die drei Perspektiven auf Demokratie voneinander zu unterscheiden sind und zweitens sollte sich auch erklären lassen, dass - wenn wir für den Moment annehmen, dass sie unterschiedlich sind - die drei Perspektiven auf Demokratie dann auch substanziell bedeutsame Einstellungskonstrukte abbilden.
+
+Die rechtfertigende Argumentation hinsichtlich der ersten Frage wurde in theoretischer Hinsicht bereits durch die Herleitung und Konzeptualisierung der drei Perspektiven auf Demokratie gegeben (siehe @sec-03-begriffe). Die besondere Herausforderung, die dieser Rechtfertigung innewohnt, dreht sich um die Frage, inwiefern die populistische und die exklusionistische Perspektive auf Demokratie zwei unterschiedliche Konstrukte darstellen. Dabei wurde argumentiert, dass die populistische Perspektive den *plebs* als zentralen politischen Referenzpunkt kennt, wohingegen die exklusionistische Perspektive auf den *ethnos* rekurriert. In @sec-05-rq1 wurde wiederum thematisiert, dass es gute Gründe dafür gibt, davon auszugehen, dass eine Überlappung der populistischen und der exklusionistischen Perspektiven auf Demokratie ein realistisches Szenario darstellt. Dass plebs und ethnos empirisch nicht weit voneinander entfernt liegen müssen, zeigt sich daran, dass viele Parteien, die als radikal rechts und populistisch klassifiziert werden [siehe @rooduijn2023a] auf beide politischen Subjekte zugleich verweisen. Wie an anderer Stelle ausführlich argumentiert wurde, ist diese Konfiguration jedoch nicht notwendiger Weise gegeben. Auch eine entsprechende Überschneidung ideologischer Elemente in den Elektoraten solcher Parteien wäre daher keine Überraschung. Es wäre theoretisch sogar plausibel, dass Befragte sowohl der Vorstellung zustimmen, politische Entscheidungen sollten stärker durch das Volk als durch Politiker getroffen werden, als auch der Vorstellung, der Wille der Mehrheit solle gegenüber Minderheiten Vorrang besitzen. Problematisch wäre eine solche Überlappung erst dann, wenn beide Zustimmungen empirisch nahezu deckungsgleich ausfallen würden. Dann ließe sich nicht mehr zeigen, dass der Verweis auf das »Volk als plebs« und der Verweis auf die »Mehrheit als ethnos« unterschiedliche demokratische Orientierungen erfassen.
+
+Die rechtfertigende Antwort auf die zweite Frage begründet sich über die hier vorgenommene Beschreibung des populistischen Zeitgeists. Die bloße Differenzierung der drei Perspektiven auf Demokratie reicht dafür nicht aus. Die Konstrukte müssen darüber hinaus hinreichende empirische Tragfähigkeit besitzen, in dem Sinne, dass sie substanziell bedeutsam sind und keine statistischen Randphänomene ausdrücken. Entscheidend ist also, dass sie dort, wo sie sich voneinander unterscheiden lassen, auch hinreichend verbreitet und strukturiert auftreten. Nur dann können sie in der anschließenden Profilanalyse als sinnvolle Dimensionen demokratischer Orientierung verwendet werden. Gelingt diese Identifikation nicht, wäre die Annahme zu überdenken, dass die drei Perspektiven eigenständige Formen des semantischen Konflikts um Demokratie im populistischen Zeitgeist darstellen. Entsprechend der *Differnzierungsthese* und der vorgebrachten Rechtfertigungen mit Blick auf die Gegenfrage, lassen sich zwei Hypothesen formulieren, die es in der empirischen Untersuchung zu prüfen gilt.
+
+\vspace{0.8em}
+
+H1.1: *Die populistische, pragmatische und exklusionistische Perspektive lassen sich in den Untersuchungsfällen jeweils empirisch voneinander unterscheiden.*
+
+\vspace{0.8em}
+
+H1.2: *Die populistische, pragmatische und exklusionistische Perspektive besitzen in den Untersuchungsfällen eine substanzielle empirische Bedeutung in dem Sinne, dass sie keine statistischen Randphänomene darstellen.*
+
+## Die *Nuancierungsthese* {#sec-06-nuancT}
+
+Unter Berücksichtigung der Unterschiede der Untersuchungsfälle innerhalb des populistischen Zeitgeist (siehe @sec-04-vergleich) wurde das Argument entfaltet, dass Deutschland, Griechenland und Österreich drei wesentliche Fälle des Phänomens repräsentieren. Jeder Fall steht dabei jeweils mit einer der drei hier untersuchten Perspektiven auf Demokratie in besonderer Verbindung: Die pragmatische Dimension in Deutschland, die populistische Dimension in Griechenland und die exklusionistische Dimension in Österreich. Entsprechend ist zu erwarten, dass populistische, pragmatische und exklusionistische Demokratieperspektiven je nach Kontext unterschiedlich prävalent und somit auch unterschiedlich kombiniert werden sollten. Die *Nuancierungsthese* lautet deshalb, dass sich analog zu der besonderen Verbindung der Fälle zu den drei Perspektiven auf Demokratie auch eine entsprechende Struktur der latenten Einstellungsprofile nachweisen lassen sollte. In diesem prüfenden Sinne wurden die drei Fälle auch als »most-likely cases« dargestellt, in denen das Auftreten eines theoretisch erwarteten Befundes besonders wahrscheinlich ist (siehe @sec-04-vergleich). Die Nuancierungsthese ist dabei aber stärker komparativ zu verstehen: Sie geht zwar davon aus, dass entsprechende Profile auch eine besondere Rolle *innerhalb* der Fälle spielen sollten, was aber nicht zwangsläufig bedeutet, dass sie immer auch das ausgeprägteste Demokratieprofil abbilden müssen. Der Versuch der Hypothetisierung solcher Rangordnungen innerhalb der Fälle scheint nicht sonderlich erkenntnisreich. Vielversprechender erscheint es hingegen eine vergleichende Nuacnierungslogik anzuwenden, die auf Unterschiede *zwischen* den Fällen gerichtet ist: Profile mit populistischer Dimension sollten in Griechenland ausgeprägter sein als in Österreich und Deutschland; exklusionistische Profile sollten in Österreich stärker hervortreten als in Griechenland und Deutschland; Profile mit ausgeprägter pragmatischer Dimension schließlich sollten in Deutschland deutlicher sichtbar werden als in Österreich und Griechenland.
+
+Die Gegenfrage lautet nun, warum diese Erwartung nicht zutreffen sollte. Welche Gründe sprechen also dagegen, dass die »most-likely«-Logik der Nuancierungsthese trägt? Auch diese Frage verlangt eine argumentative Rechtfertigung, die keineswegs trivial ist. Der Blick auf ein Szenario, das in dieser Arbeit als Möglichkeit der »Grauzone« behandelt wird und in der demokratischen Einstellungsforschung insbesondere Bezüge zum Konzept der »Stealth Democracy« aufweist, verdeutlicht, warum die Annahme konturierter Profile herausgefordert werden muss. Das Gegenargument lautet, dass Menschen keine besonders ausgeprägten Einstellungen zur Demokratie entwickeln. Sie befürworten Demokratie zwar auf Nachfrage, steigen aber aus, sobald spezifischer gefragt wird, etwa wer das zentrale politische Subjekt sein sollte oder welcher demokratische Entscheidungsmechanismus vorzugswürdig wäre. Politische Verfahren, Kompromisse und offene Konflikte erscheinen aus dieser Perspektive eher als Zumutung denn als demokratische Leistung (siehe @sec-02-dem-pref). Entsprechend wäre zu erwarten, dass latente Demokratieprofile zwischen den Fällen gerade nicht deutlich konturiert auseinanderfallen, sondern ein Muster dominiert, das eine Form demokratischer Indifferenz ausdrückt. Eng damit verbunden ist ein zweiter, für das übergeordnete Argument dieser Arbeit noch wichtigerer Einwand gegen die Nuancierungsthese: Könnte es nicht sein, dass der semantische Konflikt um Demokratie, wie er auf der Ebene politischer Akteure geführt wird, schlicht nicht in den gesellschaftlichen Bereich diffundiert? Anders verhält es sich mit dem »Nuancierungspotenzial«, das die negativen Pole der drei Perspektiven auf Demokratie enthalten. Es besteht immer auch die Möglichkeit, dass die Profile sich darüber charakterisieren, was sie mit Blick auf die Demokratie zurückweisen.
+
+Die Kenntnisnahme dieser Möglichkeiten wird einerseits über die Hypothetisierung der Prävalenz von Grauzonen aufgefangen. Wenn das Ausmaß gesellschaftlicher Polarisierung als Maßstab zur Annahme über die Verbreitung dieser herangezogen wird - wie es in @sec-04-meta beschrieben wurde - dann sollten Grauzonen-Profile grundsätzlich in allen Untersuchungsfällen möglich sein, da Deutschland und Österreich nur »etwas« und Griechenland sogar »kaum« polarisierte Kontexte darstellen (@fig-economic-development). Andererseits wird dem Nuancierungspotenzial der Gegenpole Rechnung getragen, wenn sich in der Analyse aufzeigen sollte, dass die postulierte most-likely-Logik der Fälle nicht greift - wenn sie etwa primär durch die Zurückweisung einer Perspektive auf Demokratie strukturiert sein sollten. Im weiteren Verlauf der Untersuchung, werden folgende Hypothesen geprüft:
+
+\vspace{0.8em}
+
+H2.1: *In Österreich treten Profile mit ausgeprägter exklusionistischer Orientierung deutlicher hervor als in Deutschland und Griechenland*
+
+\vspace{0.8em}
+
+H2.2: *In Griechenland treten Profile entlang populistischer und anti-populistischer Orientierung deutlicher hervor als in Deutschland und Österreich*
+
+\vspace{0.8em}
+
+H2.3: *In Deutschland treten pragmatische Profile deutlicher hervor als in Österreich und Griechenland.*
+
+\vspace{0.8em}
+
+H2.4: *In allen drei Fällen ist mindestens ein Grauzonen-Profil zu erwarten, welches durch geringe oder nur schwach konturierte Ausprägungen der Demokratieperspektiven gekennzeichnet ist.*
+
+## Die *Ähnlichkeitsthese* {#sec-06-ähnlichT}
+
+Während also erwartet wird, dass der politische Kontext die Gestalt und Verbreitung latenter demokratischer Einstellungsprofile prägt, wird gleichzeitig auch angenomnen, dass er deren soziale und politische Strukturierung *nicht* beliebig verändern kann. Ähnlich strukturierte Profile sollten daher auch über unterschiedliche Fälle hinweg vergleichbare Merkmale aufweisen, selbst wenn sie je nach Kontext unterschiedlich stark verbreitet oder akzentuiert sind. Beispielsweise könnte ein exklusionistisches, populistsiches und anti-pragmatisches Profil in Österreich wesentlich ausgeprägter sein als in Griechenland, aber unabhängig davon sollten beide Profile die gleichen sozialen und politischen Implikationen aufweisen. In diesem Sinne postuliert die *Ähnlichkeitsthese*: Wenn sich über die Fälle hinweg vergleichbare Demokratieprofile rekonstruieren lassen, sollten diese auch ähnliche sozio-demographische Grundlagen und politische Implikationen aufweisen.
+
+Unterstützend verweisen auch die im Forschungsüberblick diskutierten Studien zu den politischen Implikationen demokratischer Präferenzen darauf, dass Vorstellungen darüber, wer in einer Demokratie entscheiden sollte, welche Rolle Verfahren spielen und welchen Einfluss Expertise auf Politik haben darf, keineswegs folgenlos bleiben (siehe @sec-02-dem-impl). Länderübergreifend hängen solche demokratischen Präferenzen mit Variablen wie der ideologischen Selbstversorgung (links-rechts), mit spezifischen Parteiaffinitäten und Sympathien, sogar mit der Wahlentscheidungen von Personen zusammen. Wenn die rekonstruierten Demokratieprofile also tatsächlich substanzielle Orientierungsmuster erfassen, sollten sie auch sozial und politisch erkennbar strukturiert sein. Die rezipierte Literatur zum Zusammenhang zwischen Parteiaffinitäten und demokratischen Vorstellungen stützt die Ähnlichkeitsthese gar ganz explizit, weil sie zeigt, dass bestimmte Konfigurationen demokratischer Präferenzen wiederkehrend mit bestimmten politischen Orientierungen verbunden sind (siehe hierzu @sec-02-dem-impl). Über einzelne Fallkontexte hinweg wurden im Forschungsüberblick zwei Muster herausgearbeitet: Mehrheitszentrierte, anti-pluralistische und anti-verfahrenszentrierte Demokratievorstellungen sind eher mit der Unterstützung populistischer oder autoritärer Parteien verbunden; eliten- und verfahrenszentrierte Demokratievorstellungen hingegen eher mit Sympathien für Parteien, die liberale Prinzipien wie Gewaltenteilung, Minderheitenschutz und institutionelle Vermittlung betonen. Diese Typen prozeduraler Demokratiepräferenzen lassen sich nicht eins zu eins mit den hier untersuchten Perspektiven auf Demokratie gleichsetzen, weisen aber erkennbare Bezüge auf. Die populistische Perspektive ist anti-verfahrenzentriert, anti-elitistisch und an direkter Demokratie orientiert; die exklusionistische Perspektive ist mehrheitszentriert und anti-pluralistisch; die pragmatische Perspektive steht näher an verfahrens- und elitenzentrierten Modellen (siehe @sec-03-begriffe). Zusammengenommen legen diese Befunde nahe, dass Demokratieprofile innerhalb einzelner Fälle politisch unterscheidbar sein sollten und dass ähnlich strukturierte Profile auch über Fälle hinweg ähnliche parteipolitische Affinitäten ausbilden.
+
+Der Gegenfrage zur Ähnlichkeitsthese muss auch hier gestellt werden: Warum sollten die Demokratieprofile über die untersuchten Länderkontexte hinweg *nicht* ähnlich sein? Diese Gegenfrage fällt weniger grundsätzlich aus als bei den beiden vorherigen Annahmen. Dennoch ist nicht ausgeschlossen, dass sich ihre Bedeutung zwischen den Fällen verschiebt. Ähnliche Profile könnten auf Grund teils sehr unterschiedlicher Parteienlandschaften (siehe @sec-04-vergleich) auch verschieden politisch kanalisiert werden oder an andere Konfliktlinien anschließen. Falls sich die folgenden Hypothesen nicht bestätigen sollten, wäre es sehr interessant, fallspezifische Phänomene näher in den Blick zu nehmen.
+
+\vspace{0.8em}
+
+H3.1: *Die Demokratieprofile unterscheiden sich innerhalb eines Falls systematisch in ihren sozio-demographischen Grundlagen und allgemeinen politischen Einstellungen.*
+
+\vspace{0.8em}
+
+H3.2: *Ähnliche Demokratieprofile weisen mit Blick auf ihre soziodemographischen Grundlagen und politischen Einstellung eher Gemeinsamkeiten auf als Unterschiede*
+
+\vspace{0.8em}
+
+\clearpage
+

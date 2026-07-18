@@ -1,0 +1,759 @@
+---
+title: "Analyse I - Überprüfung der Differenzierungsthese"
+author: "Lukas Brenner"
+lang: de
+editor: visual
+header-includes:
+  - \usepackage{float}
+---
+
+```{r}
+#| label: setup-tables-analysis-i
+#| include: false
+
+library(readr)
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(stringr)
+library(here)
+
+reli_vali_csv_dir <- here(
+  "outputs",
+  "reli_vali_DE_v3_CFA_tables_wide",
+  "csv"
+)
+
+h12_tables_dir <- here(
+  "outputs",
+  "reli_vali_DE_v3_CFA_tables_wide",
+  "02_B_robustness_h1",
+  "h1_2_empirical_relevance",
+  "tables"
+)
+
+render_efa_table <- function(file,
+                             item_col = c("item_short", "item_label"),
+                             item_width = "8.2cm",
+                             code_width = "1.2cm",
+                             font_size = 8,
+                             include_summary = TRUE,
+                             include_note = TRUE,
+                             primary_threshold = 0.30,
+                             cross_threshold = 0.40,
+                             show_item_short = TRUE,
+                             construct_width = NULL) {
+
+  item_col <- match.arg(item_col)
+
+  tab <- readr::read_csv(
+    file.path(reli_vali_csv_dir, file),
+    col_types = readr::cols(.default = readr::col_character()),
+    show_col_types = FALSE
+  ) %>%
+    dplyr::mutate(
+      row_type = as.character(row_type),
+      is_summary = row_type == "eigenvalue" |
+        stringr::str_detect(row_type, "^_variance"),
+      dplyr::across(
+        dplyr::any_of(c("EXCL", "POPU", "PRG")),
+        ~ readr::parse_number(.x)
+      )
+    )
+
+  loading_rows <- tab %>%
+    dplyr::filter(row_type == "loading") %>%
+    dplyr::mutate(
+      construct_display = dplyr::case_when(
+        construct == "Exklusionistische Demokratie" ~
+          "Exklusionistische Perspektive auf Demokratie",
+        construct == "Populistische Demokratie" ~
+          "Populistische Perspektive auf Demokratie",
+        construct == "Pragmatische Demokratie" ~
+          "Pragmatische Perspektive auf Demokratie",
+        TRUE ~ construct
+      )
+    )
+
+  construct_order <- unique(loading_rows$construct)
+
+  grouped_rows <- purrr::map_dfr(
+    construct_order,
+    function(k) {
+
+      item_rows <- loading_rows %>%
+        dplyr::filter(construct == k)
+
+      header_row <- item_rows[1, ] %>%
+        dplyr::mutate(
+          row_type = "group",
+          item_short = "",
+          item_label = paste0(
+            "\\rule{0pt}{2.6ex}\\textbf{",
+            dplyr::first(construct_display),
+            "}"
+          ),
+          primary_factor = NA_character_,
+          EXCL = NA_real_,
+          POPU = NA_real_,
+          PRG = NA_real_
+        )
+
+      dplyr::bind_rows(
+        header_row,
+        item_rows
+      )
+    }
+  )
+
+  summary_rows <- tab %>%
+    dplyr::filter(include_summary & is_summary) %>%
+    dplyr::mutate(
+      construct_display = "",
+      item_short = "",
+      item_label = dplyr::case_when(
+        row_type == "eigenvalue" ~ "\\rule{0pt}{2.6ex}Eigenwert",
+        is_summary ~ "Erklärte Varianz (\\%)",
+        TRUE ~ item_label
+      ),
+      construct = "",
+      primary_factor = NA_character_
+    )
+
+  tab_show <- dplyr::bind_rows(grouped_rows, summary_rows)
+
+  format_loading_cell <- function(x, factor_name, primary_factor, row_type) {
+    mapply(
+      FUN = function(xx, pf, rt) {
+
+        if (is.na(xx)) return("")
+
+        value <- sprintf("%.3f", xx)
+
+        is_loading <- rt == "loading"
+
+        is_primary <- is_loading &&
+          !is.na(pf) &&
+          pf == factor_name &&
+          abs(xx) >= primary_threshold
+
+        is_cross <- is_loading &&
+          !is.na(pf) &&
+          pf != factor_name &&
+          abs(xx) >= cross_threshold
+
+        kableExtra::cell_spec(
+          value,
+          format = "latex",
+          bold = is_primary,
+          italic = is_cross,
+          escape = FALSE
+        )
+      },
+      x,
+      primary_factor,
+      row_type,
+      USE.NAMES = FALSE
+    )
+  }
+
+  tab_show <- tab_show %>%
+    dplyr::mutate(
+      EXCL = format_loading_cell(EXCL, "EXCL", primary_factor, row_type),
+      POPU = format_loading_cell(POPU, "POPU", primary_factor, row_type),
+      PRG  = format_loading_cell(PRG,  "PRG",  primary_factor, row_type)
+    )
+
+  if (show_item_short) {
+
+    tab_show <- tab_show %>%
+      dplyr::transmute(
+        Item = item_short,
+        Itemformulierung = dplyr::case_when(
+          row_type == "loading" ~ .data[[item_col]],
+          TRUE ~ item_label
+        ),
+        EXCL = EXCL,
+        POPU = POPU,
+        PRG  = PRG
+      )
+
+    align_vec <- c(
+      paste0("p{", code_width, "}"),
+      paste0("p{", item_width, "}"),
+      "r", "r", "r"
+    )
+
+    col_names <- c("Item", "Itemformulierung", "EXCL", "POPU", "PRG")
+
+  } else {
+
+    tab_show <- tab_show %>%
+      dplyr::transmute(
+        Item = dplyr::case_when(
+          row_type == "loading" ~ .data[[item_col]],
+          TRUE ~ item_label
+        ),
+        EXCL = EXCL,
+        POPU = POPU,
+        PRG  = PRG
+      )
+
+    align_vec <- c(
+      paste0("p{", item_width, "}"),
+      "r", "r", "r"
+    )
+
+    col_names <- c("Item", "EXCL", "POPU", "PRG")
+  }
+
+    efa_note <- paste(
+    "Rotation: oblique Target-Rotation.",
+    "Die Faktoren dürfen korrelieren; zugleich wird die Lösung an der theoretisch erwarteten Itemstruktur orientiert.",
+    "Faktorladungen geben Stärke und Richtung des Zusammenhangs zwischen Item und Faktor an.",
+    paste0("Fett = Primärladung mit |λ| ≥ ", sprintf("%.2f", primary_threshold), "."),
+    paste0("Kursiv = Kreuzladung mit |λ| ≥ ", sprintf("%.2f", cross_threshold), ".")
+  )
+
+  out <- tab_show %>%
+    kableExtra::kbl(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      align = align_vec,
+      col.names = col_names,
+      escape = FALSE,
+      linesep = ""
+    ) %>%
+    kableExtra::kable_styling(
+      font_size = font_size,
+      full_width = FALSE,
+      position = "center"
+    )
+
+  if (include_note) {
+    out <- out %>%
+      kableExtra::footnote(
+        general = efa_note,
+        general_title = "Hinweis: ",
+        footnote_as_chunk = TRUE,
+        threeparttable = TRUE,
+        fixed_small_size = TRUE,
+        escape = TRUE
+      )
+  }
+
+  knitr::asis_output(as.character(out))
+}
+
+render_cfa_fit_table <- function(study_label_keep,
+                                 file = "tableA_cfa_fit_indices.csv",
+                                 font_size = 9,
+                                 model_width = "5.1cm",
+                                 rmsea_width = "4.0cm") {
+
+  tab <- readr::read_csv(
+    file.path(reli_vali_csv_dir, file),
+    show_col_types = FALSE
+  ) %>%
+    dplyr::filter(Studie == study_label_keep) %>%
+    dplyr::select(-Studie)
+
+  cfa_note <- paste(
+    "Schätzung: MLR (Maximum-Likelihood-Schätzung).",
+    "CFI/TLI: ≥ .95 = gut, ≥ .90 = akzeptabel.",
+    "RMSEA: unter .06 = gut, unter .08 = akzeptabel.",
+    "SRMR: unter .08 = gut.",
+    "Das modifizierte Modell enthält theoretisch begründete korrelierte Residuen.",
+    "Österreich 2017: POPU = anti-elitistisch (4 Items), PRG = minimal-pragmatisch (2 Items).",
+    "Deutschland 2021 und Griechenland 2019: vollständige Itemsets."
+  )
+
+  out <- tab %>%
+    kableExtra::kbl(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      align = c(
+        paste0("p{", model_width, "}"),
+        "r",
+        "r",
+        "r",
+        "r",
+        paste0("p{", rmsea_width, "}"),
+        "r"
+      ),
+      escape = TRUE
+    ) %>%
+    kableExtra::kable_styling(
+      font_size = font_size,
+      full_width = FALSE,
+      position = "center"
+    ) %>%
+    kableExtra::footnote(
+      general = cfa_note,
+      general_title = "Hinweis: ",
+      footnote_as_chunk = TRUE,
+      threeparttable = TRUE,
+      fixed_small_size = TRUE,
+      escape = TRUE
+    )
+
+  knitr::asis_output(as.character(out))
+}
+
+render_reliability_table <- function(file,
+                                     font_size = 9,
+                                     construct_width = "9.5cm") {
+
+  tab <- readr::read_csv(
+    file.path(reli_vali_csv_dir, file),
+    show_col_types = FALSE
+  )
+
+  reli_note <- paste(
+    "α = Cronbachs Alpha.",
+    "ω = McDonalds Omega.",
+    "Akzeptable Reliabilität: α / ω ≥ .60.",
+    "Österreich 2017: länderspezifische Itemsets nach EFA-Anpassung."
+  )
+
+  out <- tab %>%
+    kableExtra::kbl(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      digits = 3,
+      align = c(
+        paste0("p{", construct_width, "}"),
+        "r",
+        "r",
+        "r"
+      ),
+      escape = TRUE
+    ) %>%
+    kableExtra::kable_styling(
+      font_size = font_size,
+      full_width = FALSE,
+      position = "center"
+    ) %>%
+    kableExtra::footnote(
+      general = reli_note,
+      general_title = "Hinweis: ",
+      footnote_as_chunk = TRUE,
+      threeparttable = TRUE,
+      fixed_small_size = TRUE,
+      escape = TRUE
+    )
+
+  knitr::asis_output(as.character(out))
+}
+
+render_h12_raw_midpoint_table <- function(study_label_keep,
+                                          file = "h1_2_raw_index_summary.csv",
+                                          font_size = 8,
+                                          construct_width = "5.5cm") {
+
+  pct_fmt <- function(x) {
+    x <- as.numeric(x)
+    ifelse(
+      is.na(x),
+      "",
+      ifelse(
+        x <= 1,
+        sprintf("%.1f%%", x * 100),
+        sprintf("%.1f%%", x)
+      )
+    )
+  }
+
+  tab <- readr::read_csv(
+    file.path(h12_tables_dir, file),
+    show_col_types = FALSE
+  ) %>%
+    dplyr::filter(study_label == study_label_keep) %>%
+    dplyr::mutate(
+      n = as.integer(n),
+      mean_raw = sprintf("%.2f", mean_raw),
+      sd_raw = sprintf("%.2f", sd_raw),
+      median_raw = sprintf("%.2f", median_raw),
+      raw_midpoint = sprintf("%.2f", raw_midpoint),
+      share_above_midpoint = pct_fmt(share_above_midpoint),
+      share_at_or_above_midpoint = pct_fmt(share_at_or_above_midpoint)
+    ) %>%
+    dplyr::select(
+      construct,
+      n,
+      mean_raw,
+      sd_raw,
+      median_raw,
+      raw_midpoint,
+      share_above_midpoint,
+      share_at_or_above_midpoint
+    ) %>%
+    dplyr::rename(
+      Konstrukt = construct,
+      N = n,
+      M = mean_raw,
+      SD = sd_raw,
+      Median = median_raw,
+      Mitte = raw_midpoint,
+      `> Mitte` = share_above_midpoint,
+      `>= Mitte` = share_at_or_above_midpoint
+    )
+
+  note <- paste(
+    "Mitte bezeichnet die theoretische Rohwertmitte des jeweiligen Konstrukts.",
+    "Sie berücksichtigt die ursprüngliche Skalenlänge der enthaltenen Items.",
+    "Bei fünfstufigen Items liegt die Itemmitte bei 3, bei vierstufigen Items bei 2.5."
+  )
+
+  out <- tab %>%
+    kableExtra::kbl(
+      format = "latex",
+      booktabs = TRUE,
+      longtable = FALSE,
+      align = c(
+        paste0("p{", construct_width, "}"),
+        "r", "r", "r", "r", "r", "r", "r"
+      ),
+      escape = TRUE
+    ) %>%
+    kableExtra::kable_styling(
+      font_size = font_size,
+      full_width = FALSE,
+      position = "center"
+    ) %>%
+    kableExtra::footnote(
+      general = note,
+      general_title = "Hinweis: ",
+      footnote_as_chunk = TRUE,
+      threeparttable = TRUE,
+      fixed_small_size = TRUE,
+      escape = TRUE
+    )
+
+  knitr::asis_output(as.character(out))
+}
+```
+
+## Grundlagen der Vorgehensweise {#sec-07-1}
+
+Ausgehend von der Konzeptualisierung der drei Perspektiven auf Demokratie in @sec-03-begriffe werden den entsprechenden Konstrukten zum Zwecke der Operationalisierung schließlich folgende Items zugeordnet(siehe @tbl-itemzuordnung-demokratieperspektiven)[^07_1]. Diese theoretische Zuordnung wird in den folgenden Abschnitten für jeden Fall getrennt anhand der in @sec-05-rq1 beschriebenen Methodik zur Beantwortung von RQ1 untersucht.
+
+[^07_1]: siehe @sec-05-rq1 für die englische Originalformulierungen der Items.
+
+```{r}
+#| label: tbl-itemzuordnung-demokratieperspektiven
+#| tbl-cap: "Zuordnung der Items zu den drei Demokratieperspektiven"
+#| results: asis
+
+item_assignment <- tibble::tribble(
+  ~`Exklusionistische Perspektive`,
+  ~`Populistische Perspektive`,
+  ~`Pragmatische Perspektive`,
+
+  "\\textbf{EXCL1} Mehrheit soll sich gegenüber Minderheiten durchsetzen (rekodiert)",
+  "\\textbf{POPU1} Das Volk, nicht Politiker, soll Politik bestimmen (rekodiert)",
+  "\\textbf{PRG1} Ablehnung von: Kompromiss bedeutet Verrat an eigenen Prinzipien",
+
+  "\\textbf{EXCL2} Minderheiten sollen sich nationalen Gepflogenheiten anpassen (rekodiert)",
+  "\\textbf{POPU2} Politiker kümmern sich nicht um die Menschen (rekodiert)",
+  "\\textbf{PRG2} Es macht einen großen Unterschied, wer politische Macht ausübt",
+
+  "\\textbf{EXCL3} Befolgung nationaler Gepflogenheiten ist wichtig (rekodiert)",
+  "\\textbf{POPU3} Politiker dienen nur Reichen und Mächtigen (rekodiert)",
+  "\\textbf{PRG3} Wählen macht einen Unterschied",
+
+  "\\textbf{EXCL4} Einwanderer schaden der nationalen Kultur (rekodiert)",
+  "\\textbf{POPU4} Politische Korruption ist weit verbreitet (rekodiert)",
+  "\\textbf{PRG4} Die meisten Politiker sind vertrauenswürdig (rekodiert)",
+
+  "\\textbf{EXCL5} Im Land geboren zu sein ist wichtig (rekodiert)",
+  "\\textbf{POPU5} Politiker sind das Hauptproblem (rekodiert)",
+  ""
+)
+
+out <- item_assignment %>%
+  kableExtra::kbl(
+    format = "latex",
+    booktabs = TRUE,
+    longtable = FALSE,
+    align = c("p{4.4cm}", "p{4.4cm}", "p{4.4cm}"),
+    escape = FALSE
+  ) %>%
+  kableExtra::kable_styling(
+    font_size = 9,
+    full_width = FALSE,
+    position = "center",
+    latex_options = "HOLD_position"
+  ) %>%
+  kableExtra::footnote(
+    general = "Quelle: CSES5 (2023); eigene Übersetzung der Items.",
+    general_title = "Hinweis: ",
+    footnote_as_chunk = TRUE,
+    threeparttable = TRUE,
+    fixed_small_size = TRUE,
+    escape = TRUE
+  )
+
+knitr::asis_output(as.character(out))
+```
+
+An dieser Stelle muss eine Limitation der Untersuchung kurz thematisiert werden. Die Operationalisierung der drei Demokratieperspektiven ist an die Möglichkeiten eines Sekundärdatensatzes gebunden. Die populistische, pragmatische und exklusionistische Perspektive auf Demokratie konnten nicht mit eigens für diese Arbeit entwickelten Items gemessen werden. Stattdessen greift die Analyse auf die Indikatoren des CSES Moduls 5 zurück, das sich aus mehreren Gründen für das Vorhaben dieser Arbeit eignet - es wurde schließlich explizit für die Untersuchung der Zusammenhänge zwischen populistischen Einstellungen, unterschiedlichen Demokratievorstellungen und politischem Verhalten konzipiert [vgl. @hobolt2016]. Dennoch gehen mit diesem Vorgehen unvermeidliche Einschränkungen einher. Für die pragmatische Perspektive auf Demokratie ist etwa das zentrale Kompromiss-Item negativ formuliert: »Was Menschen einen politischen Kompromiss nennen, ist eigentlich nur der Verrat an den eigenen Prinzipien«. Zudem lässt sich der Ursprung des Items auf erste Untersuchungen zur Stealth-Demokratie zu Beginn der 2000er Jahre zurückführen (es wurde in @hibbing2002 und später auch bei @bengtsson2009 verwendet). Als in den 2010er Jahren schließlich die Untersuchung populistischer Einstellungen Fahrt aufnahm (siehe bereits bei @akkerman2014), wurde das Item schließlich auch hier in entsprechende Itembatterien integriert (siehe @wuttke2020 und @castanhosilva2020 für Übersichtsarbeiten zu den verschiedenen Populismus-Skalen). Für die Untersuchungen in dieser Arbeit würde sich ein positiv formuliertes Item, das die Wichtigkeit politischer Kompromisssuche abfragt, wesentlich besser eignen - ein solches wurde im CSES Modul 5 in ausgewählten Wahlstudien sogar erprobt, aber in den hier betrachteten Fällen nicht erhoben. Auch ein Testitem, das den Respekt vor demokratischer Institutionen abfragt, wurde im CSES Modul 5 erprobt, liegt aber in den hier ausgewählten Studien ebenfalls nicht vor. Dieses Item hätte sich insbesondere geeignet um eine pragmatische Perspektive auf Demokratie zu operationalisieren. Insgesamt stellt die theoretische Zuordnung der Items zu den Konzepten somit eine Herausforderung dar: Innerhalb eines begrenzten Pools an zur Verfügung stehenden Items müssen alle Perspektiven hinreichend sinnhaft abgedeckt werden. In gewisser, fast schon ironischer Weise lässt sich eine Analogie zwischen der theoretischen Zuordnung der Items zu den drei Perspektiven auf Demokratie in dieser Arbeit und dem Beginn von George Lakoffs *Women, Fire, and Dangerous Things* herstellen. Mit Blick auf seinen Titel eröffnet Lakoff das Buch mit dem Satz: »Many readers, I suspect, will take the title of this book as suggesting that women, fire, and dangerous things have something in common - say, that women are fiery and dangerous« [@lakoff1987, p. 5]. Gemeint ist, dass wir im Prozess der Bedeutungszuschreibung auf Eigenschaften zurückgreifen, die wir in einem näheren oder weiteren Sinne mit Kategorien verbinden, auf welche die Bedeutung zielt. Der Unterschied zwischen dieser kognitiven Heuristik zur Erschließung der Welt, wie Lakoff sie eingangs beschreibt, und dem Vorgehen in diesem Kapitel besteht darin, dass die Sinnhaftigkeit der hier vorgenommenen Zuordnung im Folgenden einer wissenschaftlichen Prüfung unterzogen wird.
+
+## Österreich 2017 {#sec-07-aut}
+
+Blicken wir zunächst auf die Histogramme der den drei Demokratieperspektiven zugeordneten Items in Österreich, zeigen sich Zustimmungstendenzen bei mehreren exklusionistischen Items. Die Items der populistischen Dimension weisen demgegenüber eine breitere Streuung auf und innerhalb der pragmatischen Perspektive stechen vor allem die Items zur Bedeutung von Wahlen (PRG2) und politischer Machtausübung (PRG3) durch ebenfalls starke Zustimmungstendenzen hervor. Der Anteil nicht gegebener Antworten ist bei allen Items niedrig.
+
+![Histogramme der Antwortverteilung der theoretisch postulierten Items in Österreich (2017)](../outputs/plots/cses5/01_B_deskriptive_item_skalen_histogramme_DE/all_postulated_items_png/hist_all_postulated_items_AUT_2017.png){#fig-hist-aut fig-align="center" width="100%"}
+
+Die deskriptiven Verteilungen geben damit einen ersten Eindruck davon, wie die theoretisch zugeordneten Items in Österreich beantwortet wurden. Entscheidend ist aber die Frage, ob die Items innerhalb der drei postulierten Perspektiven auch empirisch gemeinsam variieren und, ob sie sich zugleich hinreichend von den jeweils anderen Perspektiven unterscheiden lassen. Zum Zwecke der Beantwortung dieser Frage wird zunächst eine explorative Faktorenanalyse (EFA) mit obliquer Target-Rotation durchgeführt (für eine detaillierte Beschreibung des Vorgehens siehe @sec-05-rq1). Dieses Verfahren erlaubt es, die theoretisch erwartete Zuordnung der Items zu den drei Demokratieperspektiven als Zielstruktur vorzugeben, ohne sie vollständig festzuschreiben. Die Ergebnisse (siehe @tbl-efaot-aut) bringen wichtige Erkenntnisse über den österreichischen Fall zum Vorschein: Die exklusionistische Perspektive ist die einzige, bei der die postulierten Items eine gemeinsame Dimension abbilden. Sowohl die populistische Perspektive auf Demokratie als auch die pragmatische Perspektive können nicht als jeweils kohärente Dimensionen betrachtet werden, was wichtige inhaltliche Implikationen zur Folge hat. Ein Blick auf die populistischen Dimension verdeutlicht, dass das zentrale Item der Volkssouveränität (POPU1) nicht mit den anderen postulierten Items zusammenhängt. In diesem Sinne kann im österreichischen Fall nicht von der Existenz einer populistischen Perspektive auf Demokratie gesprochen werden. Was stattdessen zum Vorschein kommt, lässt sich als eine rein *anti-elitäre* Perspektive auf Politik beschreiben. Diese Ebene stellt zwar ein Wesensmerkmal des Populismus dar, es ist aber nicht hinreichend, um eine populistische Perspektive auf Demokratie abzubilden, die ohne ihre zentrale Referenz auf »das Volk« als politisches Subjekt unvollständig bleibt. Wohingegen andere Forschungsarbeiten mit Blick auf das Angebot politischer Parteien etwa einen Populismus ohne Anti-Elitismus identifiziert und als »Demotizismus« bezeichnet haben [@march2018, p. 50], zeigt sich hier auf der Nachfrageseite ein unvollständiger Populismus in gespiegelter Richtung: eine anti-elitäre Einstellung ohne den Appell an die Volkssouveränität. Gilt insbesondere der österreichische Fall doch als jener in Europa, indem die radikale Rechte gerade auf Grund ihrer populistischen Inszenierung als Verkörperung des Volkswillens (findet sich sowohl bei Haider, Strache und Kickl, wie auch bei Kurz) schon früh politische Achtsamkeitserfolge einfahren konnte (siehe dazu deatilliert @sec-04-aut), so ist es umso interessanter, dass - zumindest mit Blick auf die Nachfrageseite - diese Perspektive nicht verfangen hat. Was sich stattdessen zeigt, ist, dass eine exklusionistische Perspektive auf Demokratie in der österreichischen Gesellschaft existiert. Darauf, dass eine solche Einstellung auch in den potenziellen Elektoraten radikal rechter und populistischer Parteien das ideologisch ausschlaggebend Element ist - womit vor allem betont wird, dass eine populistische Einstellung häufig überbewertet wird -, verweisen auch die Befunde anderer Forschungsarbeiten (siehe @castanhosilva2022 und @castanhosilva2023).
+
+Ebenso wie die populistische Perspektive auf Demokratie, bleibt auch die pragmatische Perspektive unzureichend nachweisbar. Die identifizierte Dimension wird vor allem von zwei Items getragen: die Einschätzung, dass die Frage danach, wer politische Gestaltungsmacht ausübt, einen großen Unterschied darstellt (PRG2), und die Einschätzung, dass der Wahlakt an und für sich einen großen Unterschied macht (PRG3). Somit lässt sich auch hier nicht von einer vollständigen Validierung des Konzepts sprechen, wohingegen der Begriff einer *minimal-pragmatischen*-Dimension eher zutreffend ist. Als ein Element der pragmatischen Perspektive auf Demokratie wurde eine Einstellung beschrieben, der nach das Volk gleichzeitig als »legitimierendes Subjekt« und als ein »in Reserve stehende Objekt« gesehen wird (siehe @sec-03-pragmatismus). Dieser dialektische Drahtseilakt scheint in der minimal-pragmatischen Perspektive auf Demokratie, wie sie im österreichischen Fall vorzufinden ist, besonders verfangen zu haben. Die vorgefundene Perspektive ist Ausdruck davon, dass es in einem demokratischen Sinne als ausreichend betrachtet wird, wenn Regierungen durch den Prozess der Wahl legitimiert und auch wieder delegitimiert werden können. Diese Perspektive steht dabei auch in einem angespannten Verhältnis zu den Items der anti-elitären Dimension, die allesamt negative Kreuzladungen im Bereich zwischen -0.25 und -0.40 aufweisen. Im Sinne der These von @canovan1999, der nach sich der Populismus und der Pragmatismus in einem permanenten Spannungsverhältnis befinden, ist es nicht verwunderlich, dass dies auch für ihre reduzierten Gestalten zutrifft.
+
+Das Kompromiss-Item und das Vertrauens-Item, welche in Österreich beide - anders als theoretisch angenommen - nicht zur pragmatischen Dimension zugehören, korrespondieren in ihrer jeweiligen Ablehnung zudem stark zu der anti-elitären Dimension. Diese starken negativen Kreuzladungen lassen die Frage aufkommen, ob sie der anti-elitären Dimension nicht zum Ausdruck einer vollständigen populistischen Perspektive auf Demokratie verhelfen würden. Diese Frage wird hier jedoch verneint, da eine solche Zuordnung nichts an der Tatsache verändert, dass das für eine vollwertige populistische Perspektive auf Demokratie notwendige Item, welches die Zentralität der Volkssouveränität bejaht, weiterhin fehlt. Das Merkmal, das in POPU1 ausgedrückt wird, ist eine notwendige Bedingung für eine populistische Perspektive auf Demokratie[^07_2].
+
+[^07_2]: Zum Zwecke der Untersuchung der Robustheit der Ergebnisse wurde die hier dargestellte EFA mit den Ergebnissen einer EFA mit Varimax- und einer Oblim-Rotation vergleichen. Die Vergleiche bestätigen die durch die oblique-target-Rotation zum Vorschein gekommene Struktur für den österreichischen Fall (für Details siehe @sec-robust-rq1-aut) .
+
+```{r}
+#| label: tbl-efaot-aut
+#| tbl-cap: "Explorative Faktorenanalyse mit obliquer Target-Rotation in Österreich (2017)"
+#| results: asis
+
+render_efa_table(
+  "efa_target_labels_AUT_2017.csv",
+  item_col = "item_label",
+  item_width = "9.0cm",
+  code_width = "1.2cm",
+  font_size = 7.5,
+  primary_threshold = 0.30,
+  cross_threshold = 0.40,
+  show_item_short = TRUE
+)
+```
+
+Die konfirmatorische Faktorenanalyse (CFA) dient im Anschluss an die EFA dazu, die nun zum Vorschein gekommene Struktur der Konstrukte zu prüfen (siehe @sec-05-rq1). Für jeden Fall wird dazu ein länderspezifisches Drei-Faktoren-Modell geschätzt, in dem die resultierenden Itemstrukturen den drei Perspektiven auf Demokratie zugeordnet werden. Die Faktoren dürfen miteinander korrelieren, was der theoretischen Annahme entspricht, dass die drei Demokratieperspektiven unterscheidbar, aber empirisch nicht notwendig unabhängig voneinander sind. Zunächst wird ein Basismodell geschätzt, in dem jedes Item ausschließlich auf den theoretisch zugeordneten Faktor lädt. Anschließend wird ein modifiziertes Modell berechnet, das zusätzlich ausgewählte residuale Korrelationen innerhalb derselben Dimension zulässt. Diese Residualkorrelationen folgen einer inhaltlichen Logik: Sie berücksichtigen, dass bestimmte Itempaare über den gemeinsamen latenten Faktor hinaus eine besonders enge semantische Nähe besitzen. Die Modifikation verändert somit nicht die grundsätzliche Drei-Faktoren-Struktur, sondern erlaubt Abhängigkeiten zwischen Items einer Dimension, die aufgrund ähnlicher Formulierungen oder enger inhaltlicher Überlappung plausibel sind. Für die exklusionistische Dimension werden residuale Korrelationen zwischen Items zugelassen, die nationale Zugehörigkeit, kulturelle Anpassung und die Bedeutung nationaler Gepflogenheiten besonders eng miteinander verbinden. Konkret betrifft dies die Korrelationen zwischen EXCL5 und EXCL3, zwischen EXCL5 und EXCL2 sowie zwischen EXCL3 und EXCL2. Für die populistische Dimension werden residuale Korrelationen zwischen Items zugelassen, die eine besonders direkte Entfremdung gegenüber politischen Eliten ausdrücken. Dies betrifft die Items POPU2 mit POPU3 sowie POPU2 mit POPU5. Für die pragmatische Dimension wird eine residuale Korrelation zwischen PRG2 und PRG3 zugelassen. Beide Items erfassen die wahrgenommene Wirksamkeit demokratischer Politik: einerseits die Bedeutung des Wahlaktes, andererseits die Frage, ob politische Macht einen Unterschied macht. Ihre enge Verbindung lässt sich als gemeinsamer Bezug auf externe politische Wirksamkeit verstehen. Wichtig ist, dass alle zugelassenen Residualkorrelationen innerhalb derselben theoretischen Dimension verbleiben. Es werden keine Residualkorrelationen zwischen Items unterschiedlicher Demokratieperspektiven eingeführt. Damit bleibt die eigentliche Prüfungslogik der CFA erhalten: Entscheidend ist weiterhin, ob sich die exklusionistische, populistische und pragmatische Perspektive als unterscheidbare latente Konstrukte abbilden lassen. Das modifizierte Modell prüft diese Struktur unter realistischeren Annahmen über lokale Itemabhängigkeiten. Für Österreich stützen die CFA-Ergebnisse die aus der EFA abgeleitete, länderspezifisch reduzierte Struktur der Konstrukte. Bereits das Basismodell erreicht insgesamt eine akzeptable bis gute Modellpassung. Das modifizierte Modell verändert die Modellpassung nur geringfügig (siehe @tbl-cfa-aut). Als Robustheitsanalyse wurden die Parameter der in der CFA geprüften Modellpassungen zusätzlich zwischen dem postulierten drei-Faktoren-Modell und einem zwei-Faktoren Modell verglichen, welches die exklusionistische und die anti-elitäre Dimension als einen gemeinsamen Faktor behandelte. Auch hier sprechen die Ergebnisse eindeutig für das postulierte drei-Faktoren-Modell (siehe @tbl-3f-2f-aut). Ebenso weisen die Ergebnisse der Reliabilitätstests der nun validierten Konstrukte allesamt hinreichend gute Werte auf (siehe @tbl-reli-aut).
+
+```{r}
+#| label: tbl-cfa-aut
+#| tbl-cap: "Konfirmatorische Faktoranalyse für Österreich (2017)"
+#| results: asis
+
+render_cfa_fit_table(
+  study_label_keep = "Österreich 2017",
+  font_size = 9,
+  model_width = "5.1cm",
+  rmsea_width = "4.0cm"
+)
+```
+
+\par\vspace{0.8em}
+
+```{r}
+#| label: tbl-reli-aut
+#| tbl-cap: "Reliabilitätstests für Österreich (2017)"
+#| results: asis
+
+render_reliability_table(
+  "tableB_reliability_AUT_2017.csv",
+  font_size = 9,
+  construct_width = "9.5cm"
+)
+```
+
+Nachdem die Konstrukte nun auf Validität und Reliabilität geprüft wurden, werden sie in Skalen transformiert. Diese Transformation folgt der aus EFA und CFA hervorgegangenen Itemstruktur. Für Österreich bedeutet dies, dass die exklusionistische Dimension aus den fünf EXCL-Items gebildet wird, während die ursprünglich populistische Perspektive als anti-elitäre Dimension und die pragmatische Perspektive als minimal-pragmatische Dimension operationalisiert werden. Für jedes Konstrukt wird zunächst ein Rohindex berechnet, indem die gültigen Items der jeweiligen Dimension gemittelt werden. Ein Blick auf die Verteilung der Rohwerte (siehe @tbl-rohwerte-aut) lässt bereits erkennen, dass die minimal-pragmatische Dimension deutlich in Richtung ihres positiven Pols gerichtet ist (85.3% der Befragten in Österreich liegen hier im Zustimmungsbereich). Die anderen beiden Konstrukte weisen hingegen eher normalverteilte Strukturen auf.
+
+Um die Items auf eine gemeinsame Metrik zu übertragen, werden sie zunächst auf Itemebene transformiert. Fünfstufige Items werden nach der Formel $\frac{x - 3}{2}$ transformiert, vierstufige Items nach der Formel $\frac{x - 2{,}5}{1{,}5}$. Auf diese Weise werden alle Items auf eine gemeinsame Skala von -1 bis +1 gebracht. Die Konstruktscores, welche die Personen schließlich erhalten, ergeben sich dann als Mittelwert der entsprechend transformierten Items. Werte deutlich oberhalb von $0$ zeigen eine Ausprägung des jeweiligen Konstrukts an, während Werte deutlich unterhalb von $0$ eine Ablehnung beziehungsweise Gegenposition markieren (siehe @fig-skalen-aut)[^07_3].
+
+[^07_3]: Robustheitsanalysen zu unterschiedlichen Skalentransformationen finden sich in @sec-robust-rq1-aut. Für den österreichischen Fall zeigen diese Tests vor allem, dass eine z-Transformation die Verteilung der minimal-pragmatischen Dimension verzerren würde. Aufgrund der breiten Zustimmung zu den beiden zugrunde liegenden Items entstünde der Eindruck einer symmetrisch um einen Mittelpunkt gestreuten Verteilung, obwohl die Werte tatsächlich deutlich in Richtung Zustimmung verschoben sind (siehe @fig-transformation-vgl-aut).
+
+Dahingehend lassen sich auch schon erste Schlussfolgerung hinsichtlich der empirischen Bedeutsamkeit der drei Perspektiven auf Demokratie in Österreich festhalten. Zuerst und am wichtigsten muss der zentrale Befund der vorherigen Analyseschritte an dieser Stell wiederholt werden: Eine populistische und eine pragmatische Perspektive auf Demokratie lassen sich zum Untersuchungszeitpunkt in Österreich nicht nachweisen. In reduzierter Form liegt eine anti-elitäre Perspektive auf Demokratie vor, die auch explizit als solche benannt wird. Der positive Pol dieser Perspektive ist stärker ausgeprägt als ihr negativer Pol. Dennoch gibt es viele Personen, die sich innerhalb einer Grauzone rund um den Nullbereich verorten lassen. Das Maximum des Konstrukts liegt jedoch eindeutig im Bereich der Zustimmung zu dieser Perspektive. Der positive Pol einer pragmatischen Perspektive auf Demokratie wurde in @sec-03-pragmatismus als Ausdruck des Vertrauens in demokratische Verfahren als friedensstiftende Formen politischer Konfliktbearbeitung beschrieben, mit einem besonderem Fokus auf den Kompromiss als Mittel der Wahl. Eine solche Einstellung lässt sich in Österreich zum Untersuchungszeitpunkt nicht nachweisen. Eine minimal pragmatische Perspektive hingegen, deren Kern die Auffassung ist, dass der eigene Wahlgang als notwendiges Mittel zur Legitimierung von Politik gesehen wird, und, dass der Wechsel politischer Mehrheiten einen Unterschied ausmacht, lässt sich identifizieren. Diese minimal-pragmatische Dimension weist eine deutliche Verzerrung hin zum positiven Pol auf. Zur Bedeutung der exklusionistischen Perspektive auf Demokratie, die in vollständiger Form vorzufinden ist, lässt sich sagen, dass das Maximum des Konstrukts deutlich im Bereich der Zustimmung liegt. Die Ränder sind weniger stark besetzt, aber sowohl Zustimmungs- als auch Ablehnungsmuster sind erkennbar (siehe @fig-skalen-aut).
+
+```{r}
+#| label: tbl-rohwerte-aut
+#| tbl-cap: "Verteilung des Rohindex der validierten Konstrukte in Österreich (2017)"
+#| results: asis
+
+render_h12_raw_midpoint_table(
+  study_label_keep = "Österreich 2017",
+  font_size = 8,
+  construct_width = "6.5cm"
+)
+```
+
+![Verteilung der Transformation der validierten Konstrukte in Österreich (2017)](../outputs/reli_vali_DE_v3_CFA_tables_wide/02_C_score_transformations/plots/main_operationalisation_scaled_midpoint/main_scaled_midpoint_density_AUT_2017.png){#fig-skalen-aut fig-align="center" width="100%"}
+
+## Griechenland 2019
+
+Blicken wir nun auf die Histogramme der den drei Demokratieperspektiven zugeordneten Items in Griechenland, deutet sich bereits ein anderes Muster als im österreichischen Fall an (siehe @fig-hist-grc). Die exklusionistischen Items weisen hier keine einheitliche Zustimmungstendenz auf. Während einzelne Items, insbesondere die Bedeutung nationaler Gepflogenheiten (EXCL3), deutlich in Richtung Zustimmung verschoben sind, bleiben andere breiter gestreut oder um die Skalenmitte konzentriert. Klarer konturiert sind die Verteilungen der populistischen Items, bei denen mehrere Items größere Anteile im Zustimmungsbereich aufweisen. Innerhalb der pragmatischen Perspektive zeigen sich ähnliche Zustimmungstendenzen wie in Österreich: Vor allem die Items zur Bedeutung von Wahlen (PRG3) und zur Relevanz politischer Machtausübung (PRG2) werden tendenziell zustimmend beantwortet. Der Anteil nicht gegebener Antworten bleibt auch im griechischen Fall niedrig.
+
+![Histogramme der Antwortverteilung der theoretisch postulierten Items in Griechenland (2019)](../outputs/plots/cses5/01_B_deskriptive_item_skalen_histogramme_DE/all_postulated_items_png/hist_all_postulated_items_GRC_2019.png){#fig-hist-grc fig-align="center" width="100%"}
+
+Die EFA bestätigt für Griechenland eine Drei-Faktoren-Struktur (siehe @tbl-efaot-grc). Damit lassen sich alle drei operationalisierten Perspektiven auf Demokratie empirisch nachweisen. Die Faktorladungen der exklusionistischen Dimension fallen zwar insgesamt niedriger aus als in Österreich, bilden aber dennoch eine deutlich zusammengehörende Dimension. Mit Blick auf die Kreuzladungen der Items des exklusionistischen Konstrukts fällt zudem auf, dass es keine Überschneidungen zu den anderen zwei Perspektiven auf Demokratie gibt[^07_4]. Für die populistische Perspektive zeigt sich, dass das Item der Volkssouveränität (POPU1) nicht isoliert steht, sondern gemeinsam mit den anti-elitären Items auf denselben Faktor lädt. Auch die Stärke der Faktorladungen verdeutlichen, dass im griechischen Fall eindeutig von einer populistischen Perspektive auf Demokratie gesprochen werden kann. Vor dem Hintergrund der Fallbeschreibung, in der die Historie der Politisierung der populistischen Dimension im griechischen Fall sowie speziell im Wahlkontext von 2019 herausgearbeitet wurde, ist dieser Befund erwartbar gewesen (siehe @sec-04-grc). Auffällig sind jedoch die starken negativen Kreuzladungen mehrerer populistischer Items auf die pragmatische Dimension. Besonders deutlich betrifft dies die Einschätzungen, dass Politiker sich nicht um die Menschen kümmern (POPU2), nur Reichen und Mächtigen dienen (POPU3). Hier zeigen sich also die zentralen Spannungspunkte an denen die populistische und die pragmatische Perspektive aneinander stoßen.
+
+[^07_4]: Zum Zwecke der Demonstration der Differenzierung, speziell zwischen populistischer und exklusionistischer Perspektive wurden Robustheitsanalysen durchgeführt, die ein Drei-Faktoren-Modell mit einem Zwei-Faktoren-Modell, das die exklusionistische und die populistische Dimension zusammenfasst, mit Blick auf gängige Fit-Indizes vergleichen (siehe ausführlich in @sec-robust-rq1-grc). Die Ergebnisse sprechen deutlich für die getrennte Modellierung der drei Perspektiven. Während das Drei-Faktoren-Modell eine akzeptable bis gute Passung erreicht, fällt die Modellpassung des Zwei-Faktoren-Modells klar schwächer aus (siehe @tbl-3f-2f-grc). Auch die ergänzenden EFA-Rotationen mit Oblimin (siehe @tbl-efaobl-grc) und Varimax (@tbl-varimax-grc) Rotationen reproduzieren die Trennung der exklusionistischen und populistischen Items in Griechenland.
+
+Zur pragmatischen Perspektive auf Demokratie muss gesagt werden, dass diese sich nun vollständig nachweisen lässt. Die Items zur Ablehnung der Kompromisskritik (PRG1), zur Bedeutung politischer Machtausübung (PRG2), zur Wirksamkeit von Wahlen (PRG3) und zur Vertrauenswürdigkeit von Politikern (PRG4) laden eindeutig auf einen gemeinsamen Faktor. Es zeigt sich aber auch dass die Spannung, die zwischen den populistischen Items und dem pragmatischen Konstrukt besteht, auch deutlich in umgekehrter Logik vorzufinden ist: Die pragmatischen Items weisen starke negative Kreuzladungen auf die populistische Dimension auf. Ähnlich wie im österreichischen Fall betrifft dies vor allem das Item zur Kompromisskritik (PRG1) sowie das Item, welches Vertrauen in politische Akteure ausdrückt (PRG4). Diese Spannung wurde theoretisch angenommen, sie findet sich, wie schon häufig wiederholt wurde, bereits in Canovans Theorie zu den zwei Gesichtern der Demokratie wieder. Obwohl die negativen Kreuzladungen der beiden Items auf die populistische Dimension stärker sind als die positiven Ladungen auf die pragmatische Dimension, werden die Items als zugehörig zu letzterer geführt. Sie geben der pragmatischen Perspektive auf Demokratie ihre vollwertige inhaltliche Substanz. Der populistische Zeitgeist drückt sich gerade dadurch aus, dass eben unterschiedliche Perspektiven auf Demokratie gegeneinander in Stellung gebracht werden. Die im griechischen Fall zur Schau tretenden Spannungen zwischen populistischer und pragmatischer Perspektive stehen sinnbildlich für diesen Konflikt[^07_5].
+
+[^07_5]: Ebenso muss darauf verwiesen werden, dass die pragmatische Dimension auch in den Robustheitsanalysen nur eingeschränkt getragen wird (siehe @sec-robust-rq1-grc). Stabil laden wie auch schon im österreichischen Fall vor allem die Items zur Bedeutung politischer Machtausübung (PRG2) und zur Wirksamkeit von Wahlen (PRG3) auf den pragmatischen Faktor, wohingegen das Kompromiss- und das Vertrauensitem stärker mit der populistischen Dimension assoziiert sind. Als Rechtfertigung für die Beibehaltung der Items innerhalb der pragmatischen Dimension gilt die gleiche Rechtfertigung wie weiter oben.
+
+```{r}
+#| label: tbl-efaot-grc
+#| tbl-cap: "Explorative Faktorenanalyse mit obliquer Target-Rotation in Griechenland (2019)"
+#| results: asis
+
+render_efa_table(
+  "efa_target_labels_GRC_2019.csv",
+  item_col = "item_label",
+  item_width = "9.0cm",
+  code_width = "1.2cm",
+  font_size = 7.5,
+  primary_threshold = 0.30,
+  cross_threshold = 0.40,
+  show_item_short = TRUE
+)
+```
+
+Die konfirmatorische Faktorenanalyse der so identifizierten Konstruktstrukturen verweist auf deutliche Unterschiede zwischen Basis- und modifiziertem Modell. Das Basismodell erreicht nur eine schwache Modellpassung: CFI und TLI bleiben unter den Schwellenwerten, RMSEA und SRMR fallen zu hoch aus. Das modifizierte Modell verbessert die Passung erheblich. Mit einem CFI von 0.952, einem TLI von 0.935, einem RMSEA von 0.051 und einem SRMR von 0.049 erreicht es insgesamt eine akzeptable Modellpassung (siehe @tbl-cfa-grc). Inhaltlich bedeutet dies, dass die Drei-Faktoren-Struktur im griechischen Fall tragfähig ist, sofern realistische lokale Abhängigkeiten zwischen semantisch eng verwandten Items berücksichtigt werden. Die zugelassenen Residualkorrelationen verändern nicht die grundsätzliche Struktur der drei Demokratieperspektiven, sondern tragen der Tatsache Rechnung, dass einzelne Items innerhalb derselben Dimension über den gemeinsamen Faktor hinaus besonders eng miteinander verbunden sind (hier trifft die gleiche Logik zu, wie sie für Österreich weiter oben ausführlich beschrieben wurde). Auch die Reliabilitätsschätzungen verweisen darauf, dass die Konstrukte hinreichend zuverlässig gemessen werden und nicht primär durch zufällige Messfehler bestimmt sind. Die exklusionistische und die populistische Dimension weisen mit Cronbachs Alpha von 0.726 sowie Omega von 0.763 gute Werte auf. Die pragmatische Dimension fällt mit Alpha von 0.627 schwächer, aber weiterhin akzeptabel aus (siehe @tbl-reli-grc). Insgesamt lässt sich festhalten, dass im griechischen Fall alle drei theoretisch postulierten Perspektiven als empirisch hinreichend valide und reliabel operationalisiert werden können.
+
+```{r}
+#| label: tbl-cfa-grc
+#| tbl-cap: "Konfirmatorische Faktoranalyse für Griechenland (2019)"
+#| results: asis
+
+render_cfa_fit_table(
+  study_label_keep = "Griechenland 2019",
+  font_size = 9,
+  model_width = "5.1cm",
+  rmsea_width = "4.0cm"
+)
+```
+
+\vspace{0.8em}
+
+```{r}
+#| label: tbl-reli-grc
+#| tbl-cap: "Reliabilitätstests für Griechenland (2019)"
+#| results: asis
+
+render_reliability_table(
+  "tableB_reliability_GRC_2019.csv",
+    font_size = 9,
+  construct_width = "9.5cm"
+)
+```
+
+Bevor die Itemstrukturen in Skalen transformiert werden, zeigt ein Blick auf die Rohwerte der Konstrukte, dass die populistische Dimension im griechischen Fall am stärksten in Richtung Zustimmung nuanciert ist (siehe @tbl-rohwerte-grc). Ihr Mittelwert liegt bei 3.52, der Median bei 3.60; 73.7 Prozent der Befragten liegen oberhalb der theoretischen Skalenmitte und 81.9 Prozent mindestens auf ihr. Dies ist ein erster Hinweis darauf, dass eine populistische Perspektive auf Demokratie zum Zeitpunkt der Erhebung in Griechenland stark prävalent war. Die pragmatische Dimension weist ebenfalls ihr größte Verbreitung im Bereich leichter Zustimmung auf, fällt aber schwächer aus als die populistische Perspektive: Der Mittelwert beträgt 3.12, der Median 3.25, 55.8 Prozent liegen oberhalb der Skalenmitte. Die exklusionistische Dimension ist demgegenüber nahezu um die Mitte verteilt. Ihr Mittelwert liegt bei 2.97, der Median bei 3.00; 44.6 Prozent der Befragten liegen oberhalb der Skalenmitte, 54.5 Prozent mindestens auf ihr (siehe @tbl-rohwerte-grc). Die Transformation der Rohindizes auf den Wertebereich von -1 bis +1 spiegelt diese Verteilungsmerkmale akkurat wider (siehe @fig-skalen-grc). Die populistische Perspektive weist dabei ein Maximum im positiven Bereich auf, indifferente Einstellungen zu dieser Perspektive gibt es wenige. Auch die pragmatische Perspektive ist eher positiv ausgeprägt, bleibt aber breiter verteilt und weniger stark konturiert als die populistische. Die exklusionistische Perspektive findet ihr stärkste Ausprägung hingegen nahe im Bereich der Skalenmitte und zeigt sowohl Prävalenzen im Bereich von Zustimmung und Ablehnung. Damit ergibt sich für Griechenland ein Befund, der für die weitere Analyse zentral ist: Anders als in Österreich lassen sich hier alle drei Demokratieperspektiven empirisch nachweisen. Besonders deutlich tritt dabei die populistische Perspektive hervor.
+
+```{r}
+#| label: tbl-rohwerte-grc
+#| tbl-cap: "Verteilung des Rohindex der validierten Konstrukte in Griechenland (2019)"
+#| results: asis
+
+render_h12_raw_midpoint_table(
+  study_label_keep = "Griechenland 2019",
+  font_size = 8,
+  construct_width = "6.5cm"
+)
+```
+
+![Verteilung der Transformation der validierten Konstrukte in Griechenland (2019)](../outputs/reli_vali_DE_v3_CFA_tables_wide/02_B_robustness_h1/h1_2_empirical_relevance/plots/h1_2_scaled_midpoint_distributions_GRC_2019.png){#fig-skalen-grc fig-align="center" width="100%"}
+
+## Deutschland 2021
+
+Ein Blick auf die Histogramme der Items, die den drei Perspektiven auf Demokratie zugeordnet wurden, zeigt für den deutschen Fall ein vergleichsweise breiter gestreutes Antwortmuster über alle Dimensionen hinweg (siehe @fig-hist-deu). Die exklusionistischen Items konzentrieren sich um die Skalenmitte oder liegen leicht im ablehnenden Bereich. Eine durchgehende Zustimmungstendenz ist hier nicht erkennbar. Die populistischen Items weisen bis auf das Item zur Abfrage der Korruptionsperzeption (POPU4) nahezu normalverteilte Strukturen auf. Im Vergleich zu den vorherigen zwei Fällen sticht zudem hervor, dass in der pragmatischen Dimension zu den wiedermals ausgeprägten Items PRG2 und PRG3 das Vertrauensitem (PRG4) hinzustößt und eine vergleichbare Verteilung in Richtung Zustimmung aufweist.
+
+![Histogramme der Antwortverteilung der theoretisch postulierten Items in Deutschland (2021)](../outputs/plots/cses5/01_B_deskriptive_item_skalen_histogramme_DE/all_postulated_items_png/hist_all_postulated_items_DEU_2021.png){#fig-hist-deu fig-align="center" width="100%"}
+
+Die EFA bestätigt auch für Deutschland die Drei-Faktoren-Struktur (siehe @tbl-efaot-deu). Trotz der leichten Ablehnungstendenz, die sich in den Items der exklusionistischen Dimension abbildet, laden alle Items geschlossen und deutlich auf einem Faktor. Mit Rückblick auf die Fallbeschreibung (siehe @sec-04-deu) lässt sich festhalten, dass die exklusionistische Perspektive auf Demokratie also auch dann hervortritt, wenn ihr parteipolitisches Äquivalent bei einer nationalen Wahl schwach abschneidet. Interessant ist mit Blick auf die Ergebnisse ebenfalls, dass die exklusionistische Perspektive tendenziell eher negativ mit der populistischen Perspektive auf Demokratie zusammenhängt. Das spricht nochmal eindeutig für die Trennung der zwei Dimensionen, die sich hier nicht gegenseitig verstärken, sondern eher entgegengesetzt zueinanderstehen[^07_6]. Die populistische Perspektive lädt zudem selbst eindeutig auf einem Faktor. Das zentrale Item zur Volkssouveränität (POPU1) weist eine schwächere Ladung auf als die anti-elitären Items, es genügt jedoch, um von einer vollständigen Dimension auszugehen. Wie in den beiden anderen Fällen verweisen auch hier die Ergebnisse auf durchgehend negative Kreuzladungen der populistischen Items auf die pragmatische Dimension. Zugleich bilden die Items der pragmatischen Perspektive im deutschen Wahlkontext von 2021 besonders deutlich eine gemeinsame Dimension ab; alle Primärladungen liegen über 0.5. Wie in den Fällen zuvor auch weisen sowohl das Kompromiss-Item als auch das Vertrauensitem negative Kreuzladungen auf die populistische Dimension auf. Die beiden Items politischer Selbstwirksamkeit innerhalb der pragmatischen Dimension sind von dieser negativen Assoziation hingegen kaum betroffen. Mit anderen Worten, lässt sich das Spannungsverhältnis zwischen Populismus und Pragmatismus in Deutschland wie folgt zusammenfassen: Pragmatisten sind sehr wahrscheinlich anti-populistisch eingestellt, wohingegen Populisten nur mit einzelnen Elementen der pragmatischen Perspektive auf Demokratie aneinanderstoßen.
+
+[^07_6]: Auch die Robustheitsanalysen bestätigen eindeutig die drei-Faktor-Struktur gegenüber einer zwei-Faktor-Struktur, welche die populistische und die exklusionistische Perspektiven bündelt (siehe @sec-robust-rq1-deu; @tbl-3f-2f-deu).
+
+```{r}
+#| label: tbl-efaot-deu
+#| tbl-cap: "Explorative Faktorenanalyse mit obliquer Target-Rotation in Deutschland (2021)"
+#| results: asis
+
+render_efa_table(
+  "efa_target_labels_DEU_2021.csv",
+  item_col = "item_label",
+  item_width = "9.0cm",
+  code_width = "1.2cm",
+  font_size = 7.5,
+  primary_threshold = 0.30,
+  cross_threshold = 0.40,
+  show_item_short = TRUE
+)
+```
+
+Die konfirmatorische Faktorenanalyse der so identifizierten Konstruktstrukturen zeigt, dass das modifizierte Modell die Passung erheblich verbessert: CFI und TLI liegen bei 0.930 beziehungsweise 0.906, RMSEA bei 0.069 und SRMR bei 0.058 (siehe @tbl-cfa-deu). Die Drei-Faktoren-Struktur kann damit im deutschen Fall als tragfähig gelten, auch wenn die Modellpassung nicht durchgehend im Bereich sehr guter Werte liegt. Inhaltlich bedeutet dies, dass die drei Demokratieperspektiven empirisch unterscheidbar sind, sofern nachvollziehbare Abhängigkeiten zwischen semantisch eng verwandten Items berücksichtigt werden. Auch die Reliabilitätsschätzungen stützen die weitere Verwendung der Konstrukte. Die exklusionistische und die populistische Dimension weisen mit Cronbachs Alpha von 0.767 (Omega von 0.777) und 0.800 (Omega 0.805) gute Werte auf. Die pragmatische Dimension fällt mit Alpha von 0.663 und Omega von 0.670 schwächer, aber weiterhin akzeptabel aus (siehe @tbl-reli-deu). Insgesamt lassen sich damit auch im deutschen Fall alle drei theoretisch postulierten Perspektiven als empirisch hinreichend valide und reliabel operationalisieren.
+
+```{r}
+#| label: tbl-cfa-deu
+#| tbl-cap: "Konfirmatorische Faktoranalyse für Deutschland (2021)"
+#| results: asis
+
+render_cfa_fit_table(
+  study_label_keep = "Deutschland 2021",
+  font_size = 9,
+  model_width = "5.1cm",
+  rmsea_width = "4.0cm"
+)
+```
+
+\vspace{0.8em}
+
+```{r}
+#| label: tbl-reli-deu
+#| tbl-cap: "Reliabilitätstests für Deutschland (2021)"
+#| results: asis
+
+render_reliability_table(
+  "tableB_reliability_DEU_2021.csv",
+    font_size = 9,
+  construct_width = "9.5cm"
+)
+```
+
+Ein Blick auf die Rohwerte der Konstrukte zeigen für Deutschland die stärkste Nuancierung bei der pragmatischen Dimension (siehe @tbl-rohwerte-deu). Ihr Mittelwert liegt bei 3.49, der Median bei 3.50; 73.6 Prozent der Befragten befinden sich oberhalb der theoretischen Skalenmitte und 82.2 Prozent mindestens auf ihr. Deutlich näher an der Mitte liegt die populistische Dimension mit einem Mittelwert von 2.91 und einem Median von 3.00; hier entfallen 40.6 Prozent der Werte auf den Bereich oberhalb der Skalenmitte und 50.8 Prozent auf Werte ab der Skalenmitte. Die exklusionistische Dimension fällt etwas schwächer aus: Ihr Mittelwert beträgt 2.82, der Median 2.80; 45 Prozent liegen oberhalb der Skalenmitte, 56.2 Prozent mindestens auf ihr. Diese Muster übertragen sich gut auf die entsprechenden Skalen (siehe @fig-skalen-deu): Die pragmatische Perspektive weist ihr Maximum klar im positiven Bereich auf, die populistische Perspektive konzentriert sich im Bereich leichter Zustimmung, während die exklusionistische Perspektive ihr Maximum in der Grauzone aufweist.
+
+```{r}
+#| label: tbl-rohwerte-deu
+#| tbl-cap: "Verteilung des Rohindex der validierten Konstrukte in Deutschland (2021)"
+#| results: asis
+
+render_h12_raw_midpoint_table(
+  study_label_keep = "Deutschland 2021",
+  font_size = 8,
+  construct_width = "6.5cm"
+)
+```
+
+\vspace{0.8em}
+
+![Verteilung der Transformation der validierten Konstrukte in Deutschland (2021)](../outputs/reli_vali_DE_v3_CFA_tables_wide/02_B_robustness_h1/h1_2_empirical_relevance/plots/h1_2_scaled_midpoint_distributions_DEU_2021.png){#fig-skalen-deu fig-align="center" width="100%"}
+
+## Fallvergleichende Bewertung der Hypothesen
+
+Die Ergebnisse der Konstruktuntersuchungen erlauben mehrere Schlussfolgerungen für die abschließende Bewertung der *Differenzierungsthese*. H1.1 postulierte, dass sich die populistische, pragmatische und exklusionistische Perspektive in allen Untersuchungsfällen empirisch voneinander unterscheiden lassen. In dieser Form lässt sich die Hypothese nicht annehmen. Zuerst muss dabei festgehalten werden, dass im österreichischen Fall weder die populistische noch die pragmatische Perspektive vollständig nachgewiesen werden konnte. Beide treten dort nur in reduzierter Gestalt hervor: Die ursprünglich populistische Perspektive wurde als *anti-elitäre Perspektive* auf Demokratie identifiziert, die pragmatische Perspektive als *minimal-pragmatische Perspektive auf Demokratie*. Die exklusionistische Perspektive hingegen konnte in vollständiger Form nachgewiesen werden. An dieser Stelle ist vorwegzunehmen, dass dieser Befund wichtig ist, da Österreich schließlich als *most-likely-Fall* beschrieben wurde, in dem latente Demokratieprofile insbesondere um diese Perspektive herum deutlich werden sollten - davon ist nach den Ergebnissen weiterhin auszugehen. Mit Blick auf die Abwesenheit der populistischen Dimension in Österreich muss konstatiert werden, dass alle drei Ansätze der EFA, die in dieser Arbeit verwendet wurden (siehe @sec-robust-rq1-aut), darauf hin deuten, dass das für die populistische Perspektive auf Demokratie zentrale Item der Volkssouveränität (POPU1) nicht oder nur sehr schwach mit den restlichen Items der Dimension zusammenhängt (lediglich, die varimax-Rotation führte zu einer Ladung von 0.35, alle anderen Items bewegen sich zwischen 0.63 und 0.75). Zusätzlich wurden alternative Operationalisierungen der Populismus-Dimension auch in Österreich getestet. Die Robustheitsanalyse (siehe @sec-robust-rq1-fallvergleich) prüft, ob sich die Ergebnisse verändern, wenn das Kompromiss-Item nicht der pragmatischen Perspektive, sondern in invertierter Form der populistischen Dimension zugeordnet wird. Die Befunde liefern keinen Anlass für eine solche Re-Zuordnung. Die Aufnahme des Anti-Kompromiss-Items verbessert die Reliabilität der additiven Populismusskala nur geringfügig[^07_7]; auch die Fit-Indizes zeigen keinen substanziellen Vorteil des erweiterten Modells (siehe @fig-pop-operat-reli und @fig-pop-operat-vgl). Zugleich bleibt der zentrale Validierungsbefund bestehen: Das Volkssouveränitätsitem (POPU1) lädt nicht konsistent mit den anti-elitistischen Items in Österreich. Das ist in Griechenland und Deutschland nicht der Fall, wo sich jeweils in allen EFA-Ansätzen stärkere Ladungen von POPU1 zeigen.
+
+[^07_7]: Dies war jedoch auch anzunehmen, da Cronbach's Alpha das hinzufügen von Items strukturell belohnt, siehe @xiao2024.
+
+Die Robustheitsanalysen verweisen dennoch auf die Doppeldeutigkeit, die dem Kompromiss- und dem Vertrauens-Item in dieser Untersuchung eingeschrieben ist. Das Kompromiss-Item kann als Element populistischer Politikvorstellungen gelesen werden, das durch die Verwendung des Begriffs des »Verrats« eher der anti-elitären Dimension zuzuordnen wäre; gleichzeitig kann es aber auch den Kern eines Gegenpols ausdrücken, welches das pragmatische Element des Kompromisses zur Herausarbeitung friedlicher politischer Lösungen meint. Das Vertrauens-Item lässt sich in invertierter Form leicht der anti-elitären Form der populistischen Perspektive auf Demokratie zuordnen, ebenso ist es aber auch ein zentraler Pfeiler für eine pragmatische Perspektive auf Demokratie, wie sie in @sec-03-pragmatismus herausgearbeitet wurde. Dieser Zusammenhang wirft grundsätzlich die Frage auf, ob die populistische und die pragmatische Perspektive auf Demokratie als zwei Pole einer gemeinsamen Dimension verstanden werden sollten, statt sie als getrennte Dimensionen zu behandeln. In dieser Arbeit wird an der zweiten Möglichkeit festgehalten. Dafür spricht zunächst, dass das Verhältnis zwischen beiden Perspektiven asymmetrisch ausfällt: Personen, die eine pragmatische Perspektive befürworten, sind mit hoher Wahrscheinlichkeit anti-populistisch eingestellt; umgekehrt folgt aus einer populistischen Perspektive jedoch nicht in gleichem Maße eine durchgehende anti-pragmatische Orientierung. Zudem zeigen die Ergebnisse, dass beide Dimensionen trotz der sichtbaren negativen Zusammenhänge empirisch unterscheidbar bleiben. Dass Perspektiven auf Demokratie miteinander konkurrieren, ist theoretisch bereits in der eingangs verwendeten Metaphorik des »semantischen Kampfs um die Besetzung des Begriffs der Demokratie« angelegt, wie @volkmann2025 [p. 18] schreibt.
+
+Da in Griechenland und Deutschland alle postulierten Items als zusammengehörige Dimensionen bestätigt werden konnten, stellt sich aber eine nächste wichtige Frage, die vordergründig inhaltliche Natur ist: warum stellt der österreichische Fall solch eine Abweichung dar? Populistische Strategien waren auf der Angebotsseite im Wahlkampf offensichtlich präsent und zwar nicht nur durch den Wahlkampf der FPÖ, sondern eben auch durch die Neupositionierung der ÖVP durch Sebastian Kurz. Warum aber hat die populistische Perspektive auf Demokratie auf der Nachfrageseite durch die Bevölkerung nicht verfangen? @rheindorf2019 verweisen etwa darauf, dass die FPÖ zwar populistische Strategien nutzt, aber, dass dadurch leicht verdeckt wird, wie stark ihre Agenda weiterhin xenophob, anti-migrationspolitisch und anti-kosmopolitisch geprägt ist (ibid., p. 5). Ähnliche Schwerpunkte konnten sich - wenn auch immer noch weniger offensichtlich als bei der FPÖ - auch in der ÖVP dieser Zeit erkennen lassen [vgl. @strobl2021, p. 79]. Im Sinne der Ergebnisse der Arbeiten von [@valentim2021; siehe auch @valentim2024a] ließe sich zudem ableiten, dass die lange parlamentarische Präsenz der FPÖ, frühere Regierungsbeteiligungen und die Koalitionsfähigkeit, die sich 2017 schon im Vorfeld angedeutet hat, schließlich dazu geführt haben, dass exklusionistische Deutungen stärker als legitime demokratische Positionen erschienen sind[^07_8]. Schließlich scheint auf der Nachfrageseite eine Deutung verfangen zu haben, der nach »das Volk« vor allem eine kulturell gefährdet und bedrohte Mehrheit darstellt. Unter Rückgriff auf die Metaphorik des semantischen Kampfes um den Demokratiebegriff lässt sich der österreichische Befund so interpretieren, dass dort vor allem die Frage verhandelt wurde, wer zum demokratischen Demos gehört — und weniger die Frage, ob das Volk unmittelbar selbst regieren sollte. In dieser Lesart erscheint die Referenz auf das Volk in der Wahrnehmung der Befragten weniger als plebejisches Subjekt unmittelbarer Selbstregierung, sondern als kulturell vorgestellte Mehrheit. Die populistische Perspektive schrumpft dadurch zu einer anti-elitären Haltung. Vielleicht muss für Österreich schließlich konstatiert werden, dass sich der »populistische Zeitgeist« insofern radikalisiert hat - und dies bereits im Jahr 2017. Die Ergebnisse der letzten Nationalratswahl in Österreich würden diese Interpretation jedenfalls decken (siehe @fig-votes-aut). Demnach ließe sich Österreich nicht mehr als Fall des populistischen Zeitgeists beschreiben, sondern eher als einer des »exklusionistischen Zeitgeists«.
+
+[^07_8]: @valentim2021 [p. 2502f.] schreibt: 
+>»Once created, cultural equilibria significantly affect the preferences individuals are willing to display in public. In feeling that some preferences are likely to be punished by others, individuals have an incentive to falsify them. This paper has explored a causal mechanism by which stigmatized preferences can become normalized: the parliamentary representation of radical right actors.«.
+
+Kommen wir nun zu der Frage nach der empirischen Substanz der so nachgewiesenen Perspektiven auf Demokratie im populistischen Zeitgeist. H1.2 postulierte, dass die populistische, pragmatische und exklusionistische Perspektive eine substanzielle empirische Bedeutung in dem Sinne besitzen, als dass sie keine statistischen Randphänomene darstellen.
+
+![Streuung der validierten Konstrukte in den Untersuchungsfällen](../outputs/reli_vali_DE_v3_CFA_tables_wide/02_B_robustness_h1/h1_2_empirical_relevance/plots/h1_2_scaled_midpoint_intervalplot_inline_austria_labels.png){#fig-skalen-faelle fig-align="center" width="100%"}
+
+Mit Blick auf H1.2 zeigt der Verteilungsplot (@fig-skalen-faelle), dass keine der untersuchten Perspektiven lediglich als statistisches Randphänomen erscheint. Die Konstrukte die aus den Itemstrukturen der explorativen Faktoranalysen hervorgegangen sind[^07_9], weisen über alle Fälle hinweg erkennbare Streuung um die Skalenmitte auf. Die Interquartilsabstände und die 10.–90.-Perzentile reichen jeweils deutlich in substanzielle Zustimmungs- und Ablehnungsbereiche hinein. Besonders sichtbar wird dies bei der exklusionistischen Perspektive, deren Verteilungen in allen drei Fällen breite Antwortmuster zeigen, auch wenn die Mittelwerte unterschiedlich stark um die Skalenmitte gelagert sind. Die populistische Perspektive beziehungsweise ihre in Österreich reduzierte Form als anti-elitäre Perspektive weist ebenfalls eine erhebliche Verteilungsbreite auf. In Griechenland verschiebt sich die Verteilung dabei am stärksten in den positiven Bereich, während Österreich und Deutschland näher an der Skalenmitte liegen. Die pragmatische Perspektive zeigt schließlich die deutlichsten positiven Ausprägungen, insbesondere in Österreich und Deutschland. Zugleich bleibt auch hier genügend Streuung erhalten, um nicht von einer bloß uniformen Zustimmung sprechen zu können. H1.2 kann daher angenommen werden: Die untersuchten Demokratieperspektiven sind empirisch substanzielle Einstellungsmuster. Sie bündeln keine marginalen Restvarianzen, sondern bilden in allen Fällen relevante Bereiche demokratischer Orientierung ab.
+
+[^07_9]: Die in den EFA-Tabellen ausgewiesenen Eigenwerte und Varianzanteile sind bei der verwendeten oblique target Rotation nur eingeschränkt als einfache Rangordnung der Faktoren zu interpretieren. Während die Eigenwerte auf die extrahierte Faktorstruktur verweisen, ergeben sich die ausgewiesenen Varianzanteile aus der rotierten Ladungsmatrix und berücksichtigen damit auch Kreuzladungen. Dass die pragmatische Perspektive bei relativ niedrigen Eigenwerten in den Fällen durchgehen den höchsten Varianzanteil aufweist, liegt daher wesentlich an den starken negativen Kreuzladungen der populistischen Items auf diese Dimension.
+
+\clearpage
+

@@ -1,0 +1,640 @@
+---
+title: "Analyse II - Überprüfung der Nuancierungsthese"
+author: "Lukas Brenner"
+lang: de
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(here)
+
+options(
+  knitr.kable.NA = "",
+  dplyr.summarise.inform = FALSE
+)
+
+# Verzeichnis mit den erzeugten LPA-Tabellen
+lpa_table_dir <- here(
+  "outputs",
+  "tables",
+  "tidylpa_scaled_midpoint",
+  "plots"
+)
+
+# Verzeichnis mit den fallvergleichenden Dimensionsmetriken
+lpa_comparison_table_dir <- here(
+  "outputs",
+  "tables",
+  "tidylpa_scaled_midpoint",
+  "cross_case_hypotheses"
+)
+
+# Ausgabeformat für HTML beziehungsweise PDF
+table_format <- function() {
+  if (knitr::is_latex_output()) {
+    "latex"
+  } else {
+    "html"
+  }
+}
+
+# Zahlen mit deutschem Dezimaltrennzeichen formatieren
+format_de <- function(
+  x,
+  digits = 2
+) {
+  formatC(
+    x,
+    format = "f",
+    digits = digits,
+    decimal.mark = ",",
+    big.mark = "."
+  )
+}
+
+# Prüfen, ob eine benötigte Datei existiert
+check_lpa_file <- function(file) {
+  if (!file.exists(file)) {
+    stop(
+      paste0(
+        "Die folgende Datei wurde nicht gefunden:\n",
+        file
+      ),
+      call. = FALSE
+    )
+  }
+
+  invisible(file)
+}
+
+# Summary-Datei eines Falls laden
+load_lpa_summary <- function(
+  study,
+  weighted = FALSE
+) {
+  weight_suffix <- if (weighted) {
+    "weighted_demographic"
+  } else {
+    "unweighted"
+  }
+
+  file <- file.path(
+    lpa_table_dir,
+    paste0(
+      "lpa_summary_",
+      study,
+      "_",
+      weight_suffix,
+      ".csv"
+    )
+  )
+
+  check_lpa_file(file)
+
+  readr::read_csv(
+    file,
+    show_col_types = FALSE
+  )
+}
+
+# Posterior-Diagnostik eines Falls laden
+load_lpa_posterior <- function(study) {
+  file <- file.path(
+    lpa_table_dir,
+    paste0(
+      "lpa_posterior_diagnostics_",
+      study,
+      ".csv"
+    )
+  )
+
+  check_lpa_file(file)
+
+  readr::read_csv(
+    file,
+    show_col_types = FALSE
+  )
+}
+
+# Fallvergleichende Dimensionsmetriken laden
+load_lpa_dimension_metrics <- function() {
+  file <- file.path(
+    lpa_comparison_table_dir,
+    "lpa_dimension_metrics_main.csv"
+  )
+
+  check_lpa_file(file)
+
+  readr::read_csv(
+    file,
+    show_col_types = FALSE
+  )
+}
+
+# Gemeinsames Tabellenlayout
+style_lpa_table <- function(
+  table,
+  first_column_width = "6cm"
+) {
+  table |>
+    kableExtra::kable_styling(
+      latex_options = c(
+        "HOLD_position",
+        "scale_down"
+      ),
+      full_width = FALSE
+    ) |>
+    kableExtra::column_spec(
+      1,
+      width = first_column_width
+    )
+}
+
+# Tabelle mit Profilgrößen, Mittelwerten und Standardabweichungen
+lpa_profile_table <- function(
+  study,
+  weighted = FALSE
+) {
+  dat <- load_lpa_summary(
+    study = study,
+    weighted = weighted
+  )
+
+  n_label <- if (weighted) {
+    "Ungewichtetes N"
+  } else {
+    "N"
+  }
+
+  pct_label <- if (weighted) {
+    "Gewichteter Anteil (%)"
+  } else {
+    "Anteil (%)"
+  }
+
+  table_data <- dat |>
+    arrange(lpa_class) |>
+    transmute(
+      Profil = class_label,
+      !!n_label := n,
+      !!pct_label := format_de(pct, 1),
+      `Populistische Demokratie` = paste0(
+        format_de(POP_mean, 2),
+        " (",
+        format_de(POP_sd, 2),
+        ")"
+      ),
+      `Pragmatische Demokratie` = paste0(
+        format_de(PRG_mean, 2),
+        " (",
+        format_de(PRG_sd, 2),
+        ")"
+      ),
+      `Exklusionistische Demokratie` = paste0(
+        format_de(EXCL_mean, 2),
+        " (",
+        format_de(EXCL_sd, 2),
+        ")"
+      )
+    )
+
+  knitr::kable(
+    table_data,
+    format = table_format(),
+    booktabs = knitr::is_latex_output(),
+    align = c(
+      "l",
+      "r",
+      "r",
+      "r",
+      "r",
+      "r"
+    ),
+    escape = TRUE
+  ) |>
+    style_lpa_table() |>
+    kableExtra::footnote(
+      general = paste0(
+        "Dargestellt sind die Profilmittelwerte. ",
+        "Standardabweichungen stehen in Klammern. ",
+        if (weighted) {
+          paste0(
+            "Die Fallzahlen beruhen auf der harten, ",
+            "ungewichteten Klassenzuordnung; Anteile, ",
+            "Mittelwerte und Standardabweichungen sind ",
+            "demografisch gewichtet."
+          )
+        } else {
+          "Die Ergebnisse sind ungewichtet."
+        }
+      ),
+      general_title = "Anmerkung: ",
+      threeparttable = knitr::is_latex_output()
+    )
+}
+
+# Tabelle mit Posteriorwahrscheinlichkeiten
+lpa_posterior_table <- function(study) {
+  summary_dat <- load_lpa_summary(
+    study = study,
+    weighted = FALSE
+  )
+
+  posterior_dat <- load_lpa_posterior(
+    study = study
+  )
+
+  entropy_value <- summary_dat |>
+    distinct(entropy) |>
+    pull(entropy)
+
+  if (length(entropy_value) != 1) {
+    stop(
+      paste0(
+        "Für ",
+        study,
+        " konnte keine eindeutige Entropie ermittelt werden."
+      ),
+      call. = FALSE
+    )
+  }
+
+  table_data <- posterior_dat |>
+    arrange(lpa_class) |>
+    transmute(
+      Profil = class_label,
+      `N` = n,
+      `Mittlere Posteriorwahrscheinlichkeit` =
+        format_de(avg_posterior, 3),
+      `Median` =
+        format_de(median_posterior, 3),
+      `Anteil ≥ 0,70 (%)` =
+        format_de(pct_posterior_ge_070, 1),
+      `Anteil ≥ 0,80 (%)` =
+        format_de(pct_posterior_ge_080, 1)
+    )
+
+  knitr::kable(
+    table_data,
+    format = table_format(),
+    booktabs = knitr::is_latex_output(),
+    align = c(
+      "l",
+      "r",
+      "r",
+      "r",
+      "r",
+      "r"
+    ),
+    escape = TRUE
+  ) |>
+    style_lpa_table() |>
+    kableExtra::footnote(
+      general = paste0(
+        "Die Entropie der Gesamtlösung beträgt ",
+        format_de(entropy_value, 3),
+        ". Die profilspezifischen Werte beziehen sich auf ",
+        "die maximale Posteriorwahrscheinlichkeit der ",
+        "jeweils zugeordneten Personen."
+      ),
+      general_title = "Hinweis: ",
+      threeparttable = knitr::is_latex_output()
+    )
+}
+
+# Kleine Tabelle mit globalen Modellkennwerten
+lpa_fit_table <- function(study) {
+  dat <- load_lpa_summary(
+    study = study,
+    weighted = FALSE
+  )
+
+  table_data <- dat |>
+    distinct(
+      study_label,
+      entropy,
+      AIC,
+      BIC,
+      SABIC
+    ) |>
+    transmute(
+      Fall = study_label,
+      Entropie = format_de(entropy, 3),
+      AIC = format_de(AIC, 1),
+      BIC = format_de(BIC, 1),
+      SABIC = format_de(SABIC, 1)
+    )
+
+  knitr::kable(
+    table_data,
+    format = table_format(),
+    booktabs = knitr::is_latex_output(),
+    align = c(
+      "l",
+      "r",
+      "r",
+      "r",
+      "r"
+    ),
+    escape = TRUE
+  ) |>
+    kableExtra::kable_styling(
+      latex_options = "HOLD_position",
+      full_width = FALSE
+    )
+}
+
+# Gemeinsame Tabelle der fallvergleichenden Dimensionsmetriken
+# Gemeinsame Tabelle der fallvergleichenden Dimensionsmetriken
+lpa_dimension_metrics_table <- function() {
+  dat <- load_lpa_dimension_metrics()
+
+  table_data <- dat |>
+    transmute(
+      Fall,
+      Dimension,
+      `Gewichtete Profildifferenz` =
+        format_de(
+          `Gewichtete mittlere Paardistanz`,
+          2
+        ),
+      Zustimmungsintensität =
+        format_de(
+          Zustimmungsintensität,
+          2
+        ),
+      Ablehnungsintensität =
+        format_de(
+          Ablehnungsintensität,
+          2
+        ),
+      Aktivierungswert =
+        format_de(
+          Aktivierungswert,
+          2
+        )
+    )
+
+  knitr::kable(
+    table_data,
+    format = table_format(),
+    booktabs = knitr::is_latex_output(),
+    align = c(
+      "l",
+      "l",
+      "r",
+      "r",
+      "r",
+      "r"
+    ),
+    escape = TRUE,
+    linesep = ""
+  ) |>
+    kableExtra::kable_styling(
+      latex_options = c(
+        "HOLD_position",
+        "scale_down"
+      ),
+      full_width = FALSE
+    ) |>
+    kableExtra::column_spec(
+      1,
+      width = "2.8cm"
+    ) |>
+    kableExtra::column_spec(
+      2,
+      width = "3.2cm"
+    ) |>
+    kableExtra::collapse_rows(
+      columns = 1,
+      valign = "top",
+      latex_hline = "major"
+    ) |>
+    kableExtra::footnote(
+      general = paste0(
+        "Die gewichtete Profildifferenz erfasst, wie stark sich ",
+        "die Profile auf einer Dimension im Durchschnitt ",
+        "voneinander unterscheiden, wobei größere Profile stärker ",
+        "berücksichtigt werden als kleine Randprofile. Die ",
+        "Zustimmungs- und Ablehnungsintensität bilden die ",
+        "Verbreitung positiver beziehungsweise negativer ",
+        "Ausprägungen ab. Der Aktivierungswert misst, wie stark ",
+        "eine Dimension insgesamt ausgeprägt ist, unabhängig von ",
+        "der Richtung dieser Ausprägung. Alle Berechnungen basieren ",
+        "auf den ungewichteten Profilanteilen und Profilmittelwerten."
+      ),
+      general_title = "Anmerkung: ",
+      threeparttable = knitr::is_latex_output()
+    )
+}
+```
+
+## Grundlagen der Vorgehensweise {#sec-08-rq2}
+
+Bevor die Ergebnisse der latenten Profilanalyse für die einzelnen Fälle dargestellt werden, ist zunächst zu klären, wie die jeweils verwendete Modelllösung bestimmt wurde. Wie in @sec-05-rq2 ausführlich beschrieben wurde, setzt die LPA einen vorgelagerten Auswahlschritt voraus, in dem die Zahl der latenten Profile und die passende Modellstruktur bestimmt werden. Für jeden Fall wurden dafür mehrere Modelltypen mit unterschiedlicher Varianz- und Kovarianzstruktur sowie jeweils ein bis fünf Profilen geschätzt und miteinander verglichen. Die Modellvarianten unterscheiden sich darin, ob die Varianzen der zugrundeliegenden Konstrukte über die Profile hinweg gleichgesetzt oder frei geschätzt werden und ob Kovarianzen zwischen den Konstrukten zugelassen werden. Zur Bewertung der Modelllösungen wurden die Informationskriterien AIC, BIC und SABIC (sample-size adjusted BIC) sowie die Entropie herangezogen. Niedrigere Werte bei AIC, BIC und SABIC sprechen für eine bessere Modellpassung unter Berücksichtigung der Modellkomplexität, höhere Entropiewerte verweisen auf eine klarere Profilzuordnung. Die Informationskriterien wurden dabei gemeinsam interpretiert. Entscheidend ist, ob zusätzliche Profile oder weniger restriktive Modellannahmen einen substanziellen Gewinn gegenüber sparsameren Lösungen erzeugen und ob die resultierenden Profile inhaltlich sinnvoll interpretierbar bleiben [vgl. @bauer2021, p. 10]. Alle Abbildungen, die den Vergleich zwischen den Informationskriterien darstellen, finden sich im Anhang unter @sec-robust-rq2.
+
+Für Griechenland verweist der Vergleich der Informationskriterien auf eine Drei-Profil-Lösung mit freien Varianzen und ohne Kovarianzen (siehe @fig-bic-aic-ent-grc im Anhang). Diese Lösung weist unter den plausiblen Kandidaten einen niedrigen BIC-Wert auf und behält zugleich eine akzeptable Entropie. Zusätzliche Profile senken zwar einzelne Informationskriterien, führen aber zu keiner überzeugenden Verbesserung der Gesamtstruktur. Für Deutschland wurde ebenfalls eine Drei-Profil-Lösung mit freien Varianzen und ohne Kovarianzen als finale Lösung ausgewählt (siehe @fig-bic-aic-ent-deu im Anhang). Der deutsche Fall wurde in einer ergänzenden Robustheitsanalyse zudem nochmal gesondert geprüft, da hier bei gleicher Profilzahl zwei Modellstrukturen miteinander konkurrieren (siehe ausführlich in @sec-robust-rq2). Die Lösung mit gleichen Varianzen und gleichen Kovarianzen weist zwar einen geringfügig besseren BIC-Wert auf, die Robustheitsprüfung zeigt jedoch, dass die Lösung mit freien Varianzen und ohne Kovarianzen stabilere Profilzuordnungen und bei wiederholten Schätzungen des Modells geringere Abweichungen der Profilmittelwerte erzeugt (siehe @fig-modell-vgl-rand-deu und @fig-modell-vgl-mw-deu). Sie wurde daher trotz des leicht schwächeren BIC-Werts als robustere und besser interpretierbare Lösung herangezogen. Für Österreich hingegen konvergierten nur die Modellfamilien mit gleichen Varianzen zuverlässig. Die flexibleren Modellvarianten mit frei geschätzten Varianzen beziehungsweise frei geschätzten Kovarianzen lieferten keine stabil verwertbaren Lösungen und können daher nicht in die finale Auswahl einbezogen werden. Unter den schätzbaren Modellfamilien spricht der Fit-Vergleich für eine Vier-Profil-Lösung mit gleichen Varianzen und gleichen Kovarianzen (siehe @fig-bic-aic-ent-aut im Anhang). Der BIC erreicht in dieser Modellfamilie bei vier Profilen den niedrigsten Wert. Eine fünfte Profilklasse verbessert einzelne Fit-Indizes nur noch geringfügig und geht zugleich mit einer geringeren Entropie einher.
+
+\begin{table}[htbp]
+\centering
+\caption{Finale Modellspezifikationen der latenten Profilanalysen}
+\label{tab:lpa-modelle}
+\begin{tabular}{llclp{6.2cm}}
+\toprule
+Fall & Jahr & Profile & Modell & Annahme zur Varianz--Kovarianz-Struktur \\
+\midrule
+Österreich
+& 2017
+& 4
+& EEE
+& Für jeden Indikator gelten über alle Profile gleiche Varianzen.
+  Die Kovarianzen zwischen den Indikatoren werden frei geschätzt,
+  jedoch ebenfalls über alle Profile gleichgesetzt. \\
+
+Deutschland
+& 2021
+& 3
+& VVI
+& Die Varianzen werden für jedes Profil frei geschätzt.
+  Die Kovarianzen zwischen den Indikatoren sind auf null fixiert. \\
+
+Griechenland
+& 2019
+& 3
+& VVI
+& Die Varianzen werden für jedes Profil frei geschätzt.
+  Die Kovarianzen zwischen den Indikatoren sind auf null fixiert. \\
+\bottomrule
+\end{tabular}
+
+\begin{minipage}{0.94\textwidth}
+\footnotesize
+\textit{Anmerkung.}
+EEE bezeichnet eine über die Profile identische vollständige
+Varianz--Kovarianz-Matrix. Das Akronym steht für
+\textit{equal volume, equal shape, equal orientation}.
+VVI bezeichnet profilspezifische diagonale
+Varianz--Kovarianz-Matrizen; die Kovarianzen sind dabei auf null
+festgelegt. Das Akronym steht für
+\textit{variable volume, variable shape, identity orientation}.
+\end{minipage}
+\end{table}
+
+Die in den LPA-Modellen spezifizierten Kovarianzstrukturen sind von den Zusammenhängen zu unterscheiden, die in den vorgelagerten faktoranalytischen Validierungsschritten sichtbar wurden. Die Faktorenanalysen dienten dazu, die empirische Unterscheidbarkeit der Demokratieperspektiven und ihre Zusammenhänge in der jeweiligen Gesamtstichprobe zu prüfen (siehe @sec-07-1). Sie bilden damit eine Grundlage für die Auswahl theoretisch zusammengehöriger, aber unterscheidbarer Indikatoren, die der hier vorgenommenen LPA zugrunde liegen. Aus den dort beobachteten Korrelationen folgt jedoch nicht, welche Zusammenhänge zwischen den Indikatoren innerhalb der später identifizierten Profile bestehen[^1]. In der LPA können Zusammenhänge zwischen den Demokratieperspektiven auf zwei unterschiedlichen Ebenen auftreten. Erstens zeigen die Profilmittelwerte, welche typischen Kombinationen der Perspektiven zwischen Personengruppen bestehen. Ein Profil kann beispielsweise durch hohe populistische und niedrige pragmatische Werte gekennzeichnet sein, während ein anderes das umgekehrte Mittelwertmuster aufweist. Zweitens beschreiben profilinterne Kovarianzen, ob Personen innerhalb desselben Profils, die auf einer Dimension von ihrem Profilmittelwert abweichen, systematisch auch auf einer anderen Dimension vom jeweiligen Profilmittelwert abweichen. Profilmittelwertmuster und profilinterne Kovarianzen beantworten daher unterschiedliche Fragen.
+
+[^1]: An dieser Stelle lohnt sich ein Verweis auf die Passage aus @sec-05-rq2 zur Unterscheidung zwischen »personenzentrierten« und »variablenzentrierten« statistischen Ansätzen.
+
+Für Deutschland und Griechenland wurden Modelle mit profilweise freien Varianzen und auf null fixierten Kovarianzen ausgewählt. Die freien Varianzen erlauben, dass sich die Profile nicht nur hinsichtlich ihrer Mittelwerte, sondern auch hinsichtlich ihrer internen Homogenität unterscheiden. Ein Profil kann beispielsweise auf der populistischen Perspektive eng gebündelt sein, während ein anderes Profil auf derselben Perspektive eine größere interne Heterogenität aufweist. Die auf null fixierten Kovarianzen entsprechen dagegen der Annahme lokaler Unabhängigkeit: Nach Berücksichtigung der Profilzugehörigkeit werden keine zusätzlichen linearen Zusammenhänge zwischen den drei Indikatoren modelliert [vgl. @bauer2021, p. 10]. Die Profile unterscheiden sich somit in ihren Zentren und ihren dimensionsspezifischen Streuungen, nicht jedoch in profilinternen Kovarianzen. Die deskriptiven Verteilungen in Deutschland und Griechenland sind mit einer solchen flexibleren Varianzstruktur vereinbar, da sie für die drei Demokratieperspektiven keine einheitliche Konzentration erkennen lassen (siehe @tbl-rohwerte-deu und @tbl-rohwerte-grc). Die Entscheidung für profilweise freie Varianzen beruht jedoch nicht allein auf den Rohwertstreuungen. Maßgeblich ist vielmehr, dass die entsprechende Modellstruktur in den Modellvergleichen stabile und inhaltlich interpretierbare Profillösungen zulässt beziehungsweise – im deutschen Fall – gegenüber dem restriktiveren Konkurrenzmodell robustere Ergebnisse erzeugt.
+
+Der österreichische Fall hingegen unterscheidet sich von Deutschland und Griechenland bereits im vorgelagerten Modellvergleich. Im Fit-Screening konvergierten nur die Modellfamilien mit gleichen Varianzen zuverlässig. Dies dürfte mit der spezifischen Verteilungsstruktur der in Österreich identifizierten Perspektiven auf Demokratie zusammenhängen. Insbesondere die minimal-pragmatische Dimension weist eine starke Konzentration oberhalb der Konstruktmitte auf (siehe @tbl-rohwerte-aut). Damit ist diese Dimension im österreichischen Fall stark prävalent und zugleich am oberen Rand konzentriert. Für flexiblere LPA-Modelle erschwert eine solche Verteilung die stabile Schätzung profilweiser unterschiedlicher Varianz- und Kovarianzstrukturen. Der empirisch belastbare Modellvergleich beschränkt sich daher auf die Modelle mit gleichen Varianzen. Dadurch wird für jede Perspektive angenommen, dass ihre jeweilige Streuung in allen vier Profilen gleich groß ist. Das ausgewählte EEE-Modell schätzt eine gemeinsame vollständige Varianz-Kovarianz-Matrix für alle vier Profile. Damit werden für die drei Indikatoren drei paarweise Kovarianzen geschätzt, deren jeweilige Werte über die Profile hinweg konstant gehalten werden. Das Modell erlaubt somit allgemeine profilinterne Zusammenhänge zwischen den Perspektiven, unterstellt jedoch, dass Richtung und Stärke dieser Zusammenhänge nicht profilspezifisch variieren. Die konkreten Kombinationen hoher und niedriger Ausprägungen, durch die sich die vier Profile inhaltlich unterscheiden, werden weiterhin durch ihre jeweiligen Profilmittelwerte abgebildet.
+
+Die finalen Modelle wurden in allen Fällen anschließend mit mehreren zufälligen Initialisierungen erneut geschätzt. Daurch lässt sich die Stabilität der identifizierten Lösungen untersuchen und zwischen den Fällen vergleichen. Die Ergebnisse zeigen durchgehend stabile Lösungen (siehe @fig-stabi-lpa-ari-faelle und @fig-stabi-lpa-mw-faelle, für eine ausführliche Beschreibung siehe @sec-robust-rq2). Die folgenden Profilzuordnungen und Posterior-Wahrscheinlichkeiten beruhen damit auf einem Vorgehen, wie es in der Literatur empfohlen wird [vgl. @spurk2020; @bauer2021].
+
+## Griechenland 2019 {#sec-08-grc}
+
+Wir beginnen die Darstellung der Ergebnisse der LPA mit der Drei-Profil-Lösung des griechischen Falls. @fig-lpa-grc zeigt sowohl die Unterschiede der Profile entlang der Profilmittelwerte als auch die Prävalenz der Profile anhand einer harten Klassenzuordnungt, bei der eine Person dem Profil zugeordnet wird, zu dem sie die größte Wahrscheinlichkeit der Profilmitgliedschaft aufweist.
+
+Erkennbar ist, dass sich zwei der drei Profile deutlich voneinander unterscheiden, zugleich aber nur einen vergleichsweise kleinen Teil der griechischen Bevölkerung umfassen. Die etwas größere dieser beiden Gruppen, der 19,7 Prozent der Befragten angehören, verbindet eine ausgeprägt populistische Perspektive auf Demokratie mit einer moderat anti-pragmatischen Haltung und einer zugleich leicht positiven Einstellung zur exklusionistischen Perspektive. Demgegenüber steht ein etwas kleineres Profil mit einem Anteil von 15,2 Prozent, das vor allem durch eine deutliche Befürwortung der pragmatischen Perspektive auf Demokratie gekennzeichnet ist. Entlang der beiden anderen Demokratiedimensionen zeigt dieses Profil keine ausgeprägte Positionierung, weist jedoch eine leichte Tendenz zum anti-populistischen Pol auf. Der wichtigste Befund besteht jedoch darin, dass zwischen diesen beiden vergleichsweise klar konturierten Profilen eine Grauzone dominiert. Dieses Profil umfasst 65,2 Prozent der griechischen Befragten im Wahlkontext des Jahres 2019 und weist eine moderate populistische Neigung auf. Da der Mittelwert dieses Profils auf der populistischen Dimension deutlich unterhalb von 0,5 liegt, kann allerdings nicht von einem primär populistisch geprägten Profil gesprochen werden. Gleichwohl fällt die Zustimmung auf dieser Dimension deutlicher aus als auf den beiden anderen Dimensionen, auf denen weder eine klare Präferenz noch eine ausgeprägte Gegenpräferenz erkennbar ist.
+
+![LPA Profilplot in Griechenland (2019)](../outputs/plots/tidylpa_scaled_midpoint/plots/GRC_2019/unweighted/combined_profile_sizes_GRC_2019.png){#fig-lpa-grc fig-align="center" width="100%"}
+
+Die so charakterisierten Profile werden dementsprechend als (1) »populistisch geneigte Grauzone«, als (2) »exklusionistisch geneigte und anti-pragmatische Populisten« und (3) als »Pragmatisten« gelabelt[^2]. Der Namensgebung liegt eine Hierarchisierungslogik zugrunde, die sich aus der Möglichkeit der LPA ergibt, ideologische Merkmale auf der Ebene von Personengruppen anhand gruppenspezifischer Mittelwerte nach ihrer relativen Ausprägungsstärke zu ordnen. Die Benennungsheuristik folgt dabei dem Schema: tertiäre Ausprägung oder schwach ausgeprägte Tendenz + sekundäre Ausprägung + primäre Ausprägung. Die dominante und damit profilprägende Dimension wird substantivisch bezeichnet, eine ebenfalls deutliche, aber nachrangige Ausprägung erscheint als Adjektiv, während der Zusatz »geneigt« eine vergleichsweise schwache Tendenz kennzeichnet. Besonders anschaulich ist diese Logik bei Profilen, die auf mehreren Dimensionen erkennbare Ausprägungen aufweisen: Die Bezeichnung »exklusionistisch geneigte anti-pragmatische Populisten« bringt demnach zum Ausdruck, dass die Angehörigen dieser Gruppe in erster Linie populistisch gegenüber der Demokratie eingestellt sind. Ihre anti-pragmatische Orientierung bildet ein weiteres deutliches, jedoch nachgeordnetes Merkmal. Die Formulierung »exklusionistisch geneigt« verweist schließlich darauf, dass die exklusionistische Orientierung unter den drei genannten Merkmalen am schwächsten ausgeprägt ist. Die Hierarchisierungslogik erweist sich auch bei Profilen als hilfreich, die lediglich auf einer der untersuchten Dimensionen eine charakteristische Ausprägung zeigen. Die Bezeichnung »Pragmatisten« signalisiert entsprechend, dass allein die pragmatische Orientierung profilprägend ist, während die betreffenden Personen weder eindeutig populistisch noch anti-populistisch und weder exklusionistisch noch anti-exklusionistisch eingestellt sind. Nach derselben Logik lässt sich auch die »populistisch geneigte Grauzone« bestimmen: Die Angehörigen dieser Gruppe weisen auf keiner der untersuchten Dimensionen eine deutlich ausgeprägte Position auf, zeigen jedoch eine schwache positive Tendenz zum Populismus.
+
+[^2]: Siehe @tbl-lpa-profile-grc-unweighted im Anhang für die Übersicht aller exakten Profilmittelwerte und deren Standardabweichung.
+
+Bereits ein erster Blick auf die zum Vorschein gekommene Profilstruktur erlaubt mehrere Beobachtungen: Zuerst fällt auf, dass *kein* Profil existiert, das eine anti-populistische Dimension enthält - was hinsichtlich der Beschreibung des Wahlkontexts von 2019 interessant ist, weil die populistische Perspektive auf Demokratie hier in beide Richtungen bespielt wurde: zum einen weiterhin durch SYRIZA, die trotz der zahlreichen Konzessionen während ihrer Regierungszeit nachdrücklich die politische Zentralität der »einfachen Leute« betonte; zum anderen durch die größte Oppositionspartei ND, die SYRIZA als erschöpft darstellte und diese Erschöpfung als Ausdruck der grundsätzlichen Grenzen populistischer Politik deutete (siehe @sec-04-grc). Dennoch scheint eine dezidiert anti-populistische Perspektive auf Demokratie in der griechischen Bevölkerung nicht verfangen zu haben - auch nicht nach einer Legislatur populistischer Regierungspolitik. Für die pragmatische Perspektive gilt dies hingegen nicht. Vielmehr verläuft hier die zentrale Konfliktlinie zwischen den Pragmatisten und den exklusionistisch geneigten und anti-pragmatischen Populisten, da die Unterschiede zwischen beiden Profilen auf der pragmatischen Dimension am stärksten ausfallen. Dies verweist zugleich darauf, dass sich eine klar anti-pragmatische Perspektive auf Demokratie herausgebildet hat, die in der griechische Bevölkerung wesentlich stärker verfangen hat als eine anti-populistische Perspektive. Mit Blick auf diesen Kernkonflikt fällt außerdem auf, dass die exklusionistische Perspektive auf Demokratie für keines der Profile eine zentrale Rolle spielt. Auf den ersten Blick ist dieser Befund auch mit der Beschreibung des Wahlkontexts vereinbar, in der herausgearbeitet wurde, dass trotz der Salienz des Migrationsthemas keine Partei einen wirklichen Schwerpunkt darauf legte. Schließlich erweist sich die Grauzone als das mit Abstand dominierende Profil in Griechenland. Angesichts der konfliktreichen Vorgeschichte der Wahl von 2019 mag dies zunächst überraschen. Ein genauerer Blick auf den griechischen Fall zeigte jedoch, dass es sich trotz der vorausgegangenen Krisen und politischen Auseinandersetzungen keineswegs um einen besonders stark polarisierten Wahlkontext handelte (siehe @sec-04-meta). Insofern fällt das Ausmaß der Prävalenz der Grauzone immer noch auf, ist aber weniger überraschend. Dennoch muss an dieser Stelle ein Bezug zu den vielen Forschungsarbeiten der Stealth-Demokratie hergestellt werden, die zeigen, dass ein Großteil der Menschen von politischen Belangen eher in Ruhe gelassen werden wollen (siehe @sec-02-dem-pref). Jetzt ist es nun offensichtlich so, dass eine indifferente Einstellung zu den drei hier untersuchten Perspektiven auf Demokratie nicht gleichzusetzen ist, mit einer Einstellung, die eine stealth-demokratische Haltung ausdrückt wie sie von @hibbing2002 konzeptualisiert wurde. Dennoch bleibt gerade innerhalb der Rahmung des populistischen Zeitgeists - der hier ja auch als Initiator einer Re-Politisierung demokratischer Einstellungsfragen gedeutet wurde (siehe @sec-03-begriffe) -, der Befund zu konstatieren, dass die größte Gruppe von Personen in der griechischen Bevölkerung eindeutig keine politisierte Form demokratischer Einstellungen ausdrücken.
+
+![LPA Verteilung der profilbezogenen Unsicherheiten in Griechenland (2019)](../outputs/plots/tidylpa_scaled_midpoint/plots/GRC_2019/unweighted/uncertainty_GRC_2019.png){#fig-uncertainity-grc fig-align="center" width="100%"}
+
+Neben den ersten Beobachtungen, die sich aus der Profilstruktur des griechischen Falls ableiten lassen, ist darauf hinzuweisen, dass die Ergebnisse der harten Klassenzuordnung mit Unsicherheiten behaftet sind. Für jede Person liegt eine Wahrscheinlichkeitsangabe vor, die ausdrückt, mit welcher Sicherheit sie einem Profil zugeordnet wird. Diese posterioren Wahrscheinlichkeiten geben an, mit welcher Wahrscheinlichkeit die Befragten den jeweiligen Profilen angehören. Die explizite Berücksichtigung dieser Unsicherheit ist eine Stärke der latenten Profilanalyse und lässt sich auch empirisch abbilden: @fig-uncertainity-grc zeigt für jedes Profil die Verteilung der maximalen posterioren Wahrscheinlichkeiten der ihm zugeordneten Personen. @tbl-lpa-posterior-grc quantifiziert, dass die durchschnittliche maximale Posteriorwahrscheinlichkeit mit 0,883 für die populistisch geneigte Grauzone am höchsten ausfällt; auch der Median liegt mit 0,939 auf einem hohen Niveau. 87,8 Prozent der diesem Profil zugeordneten Befragten weisen eine maximale Posteriorwahrscheinlichkeit von mindestens 0,70 auf, bei 78,4 Prozent beträgt sie mindestens 0,80. Es folgen die exklusionistisch geneigten und anti-pragmatischen Populisten mit einem Mittelwert von 0,855 und einem Median von 0,930. In diesem Profil erreichen 76,1 Prozent der Befragten einen Wert von mindestens 0,70 und 67,0 Prozent einen Wert von mindestens 0,80. Die geringste, insgesamt aber weiterhin vergleichsweise hohe Klassifikationssicherheit zeigt sich bei den Pragmatisten: Ihre durchschnittliche maximale Posteriorwahrscheinlichkeit beträgt 0,845, der Median liegt bei 0,889. 79,2 Prozent der zugeordneten Personen erreichen mindestens 0,70 und 66,1 Prozent mindestens 0,80. Dass die Mediane in allen drei Profilen oberhalb der jeweiligen Mittelwerte liegen, verweist zugleich auf eine kleinere Gruppe vergleichsweise unsicher klassifizierter Personen, die die Durchschnittswerte etwas nach unten zieht. Ergänzend zur eigentlichen Klassifikationssicherheit lässt sich auch die inhaltliche Trennschärfe der Profile anhand ihrer Unterschiede auf den einzelnen Dimensionen beurteilen. Bereits @fig-lpa-grc zeigt, dass sich die identifizierten Profile auf der exklusionistischen Dimension nur geringfügig unterscheiden, während die Unterschiede auf der populistischen Dimension deutlicher und auf der pragmatischen Dimension am stärksten hervortreten. Betrachtet man die Verteilung der den Profilen zugeordneten Personen in sämtlichen Kombinationen der entsprechenden zweidimensionalen Räume (siehe @fig-clpairs-grc im Anhang), wird deutlich, dass insbesondere in jenen Dimensionspaaren, die die exklusionistische Perspektive auf Demokratie einbeziehen, erhebliche Überlappungen zwischen den Profilen bestehen. Insgesamt bestätigt die paarweise Darstellung, dass die Profilbildung vor allem durch Unterschiede in der pragmatischen und, in geringerem Maße, in der populistischen Orientierung getragen wird, während die exklusionistische Dimension nur begrenzt zur Trennung der Profile beiträgt. Das Gesamtmodell weist schließlich eine Entropie von 0,721 auf. Die Entropie ist ein globales Maß für die Klassifikationssicherheit der gesamten Profillösung und berücksichtigt die vollständige Verteilung der Profilmitgliedschaftswahrscheinlichkeiten über alle Personen und Profile hinweg[^3]. Werte oberhalb von 0,80 werden üblicherweise angestrebt, während Werte ab 0,60 als grundsätzlich akzeptabel gelten [vgl. @bauer2021, p. 11].
+
+[^3]: Siehe @fig-entropie-grc im Anhang für einen Verteilungsplot, der die Zugehörigkeitswahrscheinlichkeit aller Personen für jedes Profil abbildet.
+
+```{r}
+#| label: tbl-lpa-posterior-grc
+#| tbl-cap: "Klassifikationsqualität der Drei-Profil-Lösung für Griechenland 2019."
+#| echo: false
+
+lpa_posterior_table("GRC_2019")
+```
+
+Da die Struktur der latenten demokratischen Einstellungsprofile innerhalb des griechischen Wahlkontexts von 2019 nun durchdrungen wurde, lassen sich unmittelbare Fragen ableiten, die auf die politischen Implikationen der den latenten demokratischen Einstellungsprofilen zugeordneten Personen gerichtet sind. So bleibt zu klären, wie sich etwa das ausgeprägt anti-pragmatische Element des primär populistischen Profils gegenüber SYRIZA auswirkt, deren Regierungsprojekt populistische Repräsentationsansprüche mit dem Versprechen pragmatischer Handlungsfähigkeit ja zu verbinden suchte. Ebenso stellt sich die Frage, wie sich die dominierende Grauzone politisch ausdrückt: Bleibt ihre populistische Neigung folgenlos, oder kann sie unter bestimmten Bedingungen den Ausschlag für die Unterstützung entsprechender Angebote geben? Oder orientiert sie sich trotz dieser Neigung in eine ganz andere politische Richtung?
+
+## Deutschland 2021
+
+Die Profillösung für den deutschen Fall wurde auf Grundlage desselben VVI-Modells und mit derselben Profilanzahl geschätzt wie die griechischen Bevölkerungsdaten. Entsprechend lässt sich auch eine in der Struktur ähnliche Profilstruktur erkennen: Wie in Griechenland zeigen sich drei Profile, von denen zwei deutlich konturierter, zugleich aber weniger verbreitet sind, während sich zwischen ihnen erneut eine Grauzone befindet. Über diese Gemeinsamkeiten hinaus unterscheiden sich die Ergebnisse des deutschen Falls jedoch deutlich von den Befunden für Griechenland.
+
+@fig-lpa-deu zeigt, dass die Grauzone mit 50,7 Prozent der Befragten diesmal nur knapp die Hälfte der Stichprobe umfasst. Das Profil ist zwar ebenfalls auf keiner der drei Dimensionen durch eine stark ausgeprägte Position gekennzeichnet, weist jedoch eine positive Neigung zur pragmatischen Perspektive auf Demokratie auf. Daher handelt es sich diesmal um eine »pragmatisch geneigte Grauzone«. Ihr stehen zwei kleinere, inhaltlich deutlich stärker konturierte Profile gegenüber. Das erste umfasst 27,5 Prozent der Befragten und verbindet eine ausgeprägt pragmatische mit einer deutlich anti-populistischen Orientierung. Auf der exklusionistischen Dimension weist diese Gruppe zudem eine leicht negative Positionierung auf. Da die pragmatische Orientierung das stärkste Merkmal bildet und die anti-populistische Haltung dieses näher bestimmt, wird die Gruppe der diesem Profil zugeordneten Personen als »anti-populistische Pragmatiker« bezeichnet. Das dritte Profil umfasst 21,8 Prozent der Befragten und ist in erster Linie durch eine deutlich populistische Perspektive auf Demokratie gekennzeichnet. Gleichzeitig weist es eine moderat anti-pragmatische Haltung und eine schwach positive exklusionistische Orientierung auf, was zu der Schlussfolgerung führt, dass »exklusionistisch geneigten Populisten« vorzufinden sind.
+
+![LPA Profilplot in Deutschland (2021)](../outputs/plots/tidylpa_scaled_midpoint/plots/DEU_2021/unweighted/combined_profile_sizes_DEU_2021.png){#fig-lpa-deu fig-align="center" width="100%"}
+
+Der Kernkonflikt, dem nach sich die Profile voneinander unterscheiden, spielt sich auf der populistischen Dimension ab. Hier unterscheiden sich die Profile am deutlichsten, was gleichzeitig zum Ausdruck bringt, dass diesmal auch eine dezidiert anti-populistische Perspektive auf Demokratie als profil-charakterisierendes Element identifiziert werden kann (siehe @tbl-lpa-profile-deu-unweighted im Anhang für eine Übersicht der folgenden Werte). Mehr als ein Viertel der deutschen Bevölkerung verbindet zum Zeitpunkt des Wahlkontexts von 2021 eine solche negative Bewertung der populistischen Perspektive (Mittelwert −0,44) mit einer deutlichen Zustimmung zu pragmatischen Perspektive auf Demokratie (Mittelwert 0,59). Demgegenüber sind die exklusionistisch neigenden Populisten indifferent auf der pragmatischen Ebene (mit leichter Tendenz zur Ablehnung, Mittelwert -0,21), was nochmals herausstellt, dass der Konflikt zwischen den beiden Profilen vor allem auf der populistischen Dimension stattfindet - hier stehen sich zwei Pole gegenüber. Zwar ist der Abstand zwischen diesen beiden Profilen auf der pragmatischen Dimension mit 0,80 Punkten annähernd so groß wie auf der populistischen Dimension mit 0,94 Punkten. Daraus lässt sich jedoch nicht dieselbe inhaltliche Schlussfolgerung ableiten. Auf der populistischen Dimension stehen sich eine deutlich negative und eine deutlich positive Orientierung gegenüber. Auf der pragmatischen Dimension trifft hingegen eine stark zustimmende Position auf eine lediglich moderat ablehnende Haltung. Der Konflikt ist daher auf der populistischen Dimension symmetrischer und inhaltlich klarer polarisiert. Grundsätzlich zeigt der deutsche Fall, dass auf allen drei Dimensionen unterschiedliche Nuancierungen zwischen den Profilen bestehen. Auch auf der exklusionistischen Dimension liegen die Profile weniger eng beieinander als noch im griechischen Fall. Die anti-populistischen Pragmatiker weisen hier mit −0,20 eine leicht ablehnende Position auf, während die exklusionistisch geneigten Populisten mit 0,26 eine moderat positive Orientierung zeigen. Die pragmatisch geneigte Grauzone nimmt mit einem Mittelwert von 0,01 nahezu exakt eine neutrale Position ein. Damit trägt auch die exklusionistische Dimension zur Unterscheidung der Profile bei, wenngleich sie gegenüber der populistischen und pragmatischen Dimension von nachgeordneter Bedeutung bleibt.
+
+Erste Überlegungen zu den vorzufindenden Profilstrukturen lassen sich in folgenden Punkten bündeln: Ziemlich genau die Hälfte der deutschen Bevölkerung lässt sich zum Zeitpunkt rund um die »Unikats-Bundestagswahl« von 2021 *fast* antithetischen latenten Demokratieprofilen zuordnen. Das spricht erstmal für eine wahrnehmbare Polarisierung demokratischer Einstellungen , die sich auch analog zur ansteigenden politischen Polarisierung lesen lässt, wie sie in @sec-04-meta für Deutschland festgehalten wurden. Die Profile, die sich gegenüberstehen sind sich dabei aber nicht perfekt spiegelbildlich: den anti-populistischen Pragmatikern stehen nicht anti-pragmatische Populisten gegenüber, sondern exklusionistisch neigende Populisten. Auch dieses Muster lässt sich mit der Beschreibung des deutschen Wahlkontexts in Verbindung bringen. Einerseits wurde auf Grundlage der Fallanalyse bereits angenommen, dass die pragmatische Perspektive auf Demokratie unter den Bedingungen eines von Unsicherheit geprägten Wahlkampfs auf besondere Zustimmung stoßen dürfte. Eine klar profilprägende Ablehnung dieser Perspektive lässt sich tatsächlich nicht nachweisen; wohl aber eine deutliche Zustimmung innerhalb des Profils der anti-populistischen Pragmatiker sowie die leichte Affinität der ansonsten indifferenten Grauzone (der wiederum alleine die andere Hälfte der deutschen Bevölkerung zugeordnet werden kann). Andererseits passt das Muster der exklusionistisch neigenden Populisten zu Beschreibungen des Elektorats radikaler rechter und populistischer Parteien, aber mit umgekehrten Vorzeichen. Dieser Umstand lässt einen nächsten wichtigen Beobachtung mit Blick auf den deutschen Fall zu: Wenn die exklusionistisch neigenden Populisten in Deutschland tatsächlich das Milieu der AfD Sympathisanten ausmachen sollten, so verrät der Befund auch, dass die populistische Einstellung in dieser Gruppe wichtiger zu sein scheint, als die exklusionistische Dimension. Beide Elemente schließen einander nicht aus, doch scheint im deutschen Fall die Vorstellung des Primaten des »Volkes« gegenüber der Betonung einer exkludierenden »Mehrheit« zu überwiegen. Dies ist insofern bemerkenswert, als die Forschung häufig eine umgekehrte Reihenfolge hinsichtlich der Wichtigkeit nahelegt [vgl. @art2022; @castanhosilva2022; @betz2017; @mudde2007].
+
+![LPA Verteilung der profilbezogenen Unsicherheiten in Deutschland (2021)](../outputs/plots/tidylpa_scaled_midpoint/plots/DEU_2021/unweighted/uncertainty_DEU_2021.png){#fig-uncertainity-deu fig-align="center" width="100%"}
+
+Neben der inhaltlichen Interpretation der Profilstruktur ist erneut die Unsicherheit der harten Klassenzuordnung zu berücksichtigen. @fig-uncertainty-deu zeigt für jedes Profil die Verteilung der maximalen posterioren Zugehörigkeitswahrscheinlichkeiten der zugeordneten Personen. Die höchste Klassifikationssicherheit weisen die anti-populistischen Pragmatiker auf. Ihre durchschnittliche maximale Posteriorwahrscheinlichkeit beträgt 0,871, der Median liegt bei 0,943. 83,3 Prozent der diesem Profil zugeordneten Personen erreichen eine Wahrscheinlichkeit von mindestens 0,70, bei 72,3 Prozent beträgt sie mindestens 0,80. Nahezu identische Werte zeigen sich für die exklusionistisch geneigten Populisten. Ihre durchschnittliche maximale Posteriorwahrscheinlichkeit liegt bei 0,870 und ihr Median bei 0,948. 80,8 Prozent der zugeordneten Personen erreichen mindestens 0,70 und 72,0 Prozent mindestens 0,80. Eine geringere Klassifikationssicherheit zeigt sich für die pragmatisch geneigte Grauzone. Ihre durchschnittliche maximale Posteriorwahrscheinlichkeit beträgt 0,816, während der Median bei 0,857 liegt. 79,6 Prozent der zugeordneten Personen erreichen eine Wahrscheinlichkeit von mindestens 0,70; bei 62,3 Prozent liegt sie oberhalb von 0,80. Damit ist die Grauzone weniger eindeutig von den beiden anderen Profilen getrennt als diese untereinander. Auch in der paarweise Darstellung der drei Einstellungsdimensionen wird dieses Muster deutlich (siehe @fig-clpairs-deu im Anhang). Hier liegt die pragmatisch geneigte Grauzone mit erkennbaren Überschneidungen zwischen den beiden Gruppen. Sobald die exklusionistische Dimension einbezogen wird, nehmen diese Überlappungen deutlich zu. Zwar weisen die beiden profilierten Gruppen auch hier unterschiedliche Schwerpunkte auf, doch ist die exklusionistische Orientierung innerhalb aller drei Profile vergleichsweise heterogen. Das Gesamtmodell weist eine Entropie von 0,668 auf[^4]. Damit liegt die globale Klassifikationssicherheit oberhalb des häufig als grundsätzlich akzeptabel betrachteten Schwellenwerts von 0,60, bleibt jedoch unterhalb des üblicherweise angestrebten Werts von 0,80. Die vergleichsweise moderate Entropie ist vor allem vor dem Hintergrund der pragmatisch geneigten Grauzone zu interpretieren, deren Position sich mit den beiden stärker konturierten Profilen überschneidet. Da es sich aber eben ja auch um eine »Grauzone« handelt ist diese moderate Klassfikationsunsicherheit theoretisch plausibel.
+
+[^4]: Siehe @fig-entropie-deu im Anhang für die Verteilung der posterioren Zugehörigkeitswahrscheinlichkeiten aller Personen zu den drei Profilen.
+
+```{r}
+#| label: tbl-lpa-posterior-deu
+#| tbl-cap: "Klassifikationsqualität der Drei-Profil-Lösung für Deutschland 2021."
+#| echo: false
+
+lpa_posterior_table("DEU_2021")
+```
+
+Schließlich stellen sich auch für Deutschland dringende Fragen nach den politischen Implikationen der so identifizierten Profile: An welche der etablierten Parteien, die sich in der Post-Merkel-Ära nahezu durchweg als pragmatische und handlungsfähige Akteure zu inszenieren versuchten, schließt das dominant pragmatische Profil vorrangig an? Orientieren sich die exklusionistisch geneigten Populisten eher am radikal rechten und populistischen oder auch am radikal linken und populistischen Angebot – oder lassen sie sich keinem dieser beiden Pole eindeutig zuordnen, lehnen Parteien sogar als Ganzes ab? Und schließlich stellt sich angesichts ihrer Größe die wohl wichtigste Frage: Welche politischen Implikationen gehen von der pragmatisch geneigten Grauzone aus?
+
+## Österreich 2017
+
+Die repräsentativen Befragungsdaten aus Österreich weisen eine andere Verteilungsstruktur der Profile auf als in den beiden zuvor untersuchten Fällen. Das EEE-Modell, das auf der Annahme gleicher Varianzen und Kovarianzen in allen Profilen basiert, identifiziert für den Wahlkontext von 2017 vier Profile. In der Mitte dominiert nun keine Grauzone mehr; stattdessen ragen zwei nahezu gleich große und klar konturierte Profile heraus, die zusammen rund drei Viertel der Befragten umfassen. Neben einer Grauzone, der diesmal aber nur knapp jede sechste Person angehört, findet sich zudem ein kleines randständiges Profil, das etwas weniger als zehn Prozent der Befragten umfasst.
+
+![LPA Profilplot in Österreich (2021)](../outputs/plots/tidylpa_scaled_midpoint/plots/AUT_2017/unweighted/combined_profile_sizes_AUT_2017.png){#fig-lpa-aut fig-align="center" width="100%"}
+
+@fig-lpa-aut veranschaulicht, wie sich diese Profile inhaltlich voneinander unterscheiden (siehe @tbl-lpa-profile-aut-unweighted für alle folgenden Werte): Die beiden größten Profile unterscheiden sich vor allem auf der anti-elitären und der exklusionistischen Dimension, während beide stark minimal-pragmatisch orientiert sind. Dabei werden 38,6 Prozent als »anti-elitäre und exklusionistische Minimalpragmatiker« bezeichnet. Dieses Profil ist auf allen drei in Österreich identifizierten Perspektiven auf Demokratie deutlich positiv ausgeprägt: Es bejaht eine minimal-pragmatische Perspektive (Mittelwert 0,83), stimmt einer exklusionistischen Perspektive am deutlichsten zu (Mittelwert 0,44) und weist zugleich den höchsten Wert auf der anti-elitären Dimension auf (Mittelwert 0,39). Demgegenüber stehen 37,3 Prozent »anti-anti-elitärer Minimalpragmatiker«. Diese Gruppe weist ebenfalls eine hohe Zustimmung zur minimal-pragmatischen Dimension auf (Mittelwert 0,85), liegt auf der exklusionistischen Dimension im Bereich der Grauzone (Mittelwert −0,12) und bringt als einziges Profil eine deutliche Ablehnung der anti-elitären Dimension zum Ausdruck (Mittelwert −0,47), was ihr unweigerlich die sperrige Bezeichnung des »Anti-Anti-Elitismus« einbringt. Die österreichische Grauzone weicht von der aus Griechenland und Deutschland bekannten Vorstellung eines überwiegend indifferenten Zwischenprofils ab: erstens aufgrund ihrer Größe, da sie nur 15,6 Prozent der Bevölkerung umfasst, und zweitens aufgrund der Neigungen, die sich in ihr gleichzeitig manifestieren. Als einziges Profil verkörpert sie in Österreich eine leichte Ablehnung der minimal-pragmatischen Dimension (Mittelwert −0,23); zugleich ist sie durch eine leichte Zustimmung sowohl zur exklusionistischen (Mittelwert 0,21) als auch zur anti-elitären Dimension (Mittelwert 0,27) gekennzeichnet. Auch sie bildet damit ein schwächer strukturiertes, in seiner Ausrichtung jedoch bereits erkennbar exklusionistisch und anti-elitär eingefärbtes Profil, was ihr die Bezeichnung als »exklusionistisch und anti-elitär geneigte Grauzone« einbringt. Schließlich wurde ein Randprofil identifiziert, das auf der anti-elitären Dimension (Mittelwert 0,34) und der minimal-pragmatischen Dimension (Mittelwert 0,88) den anti-elitären und exklusionistischen Minimalpragmatikern ähnelt, sich auf der exklusionistischen Dimension jedoch fundamental von ihnen unterscheidet und hier durch eine deutliche Ablehnung die Gegenposition einnimmt (Mittelwert −0,42). Dieser Gruppe der »anti-exklusionistischen Minimalpragmatiker« werden 8,5 Prozent der österreichischen Bevölkerung zugeordnet[^5].
+
+[^5]: Eine Gewichtung der Ergebnisse der LPA verschiebt die Größenanteile der Profile deutlich in Richtung der exklusionistisch geprägten Profile (siehe @tbl-lpa-profile-aut-weighted): Die anti-elitären und exklusionistischen Minimalpragmatiker legen um 4,9 Prozentpunkte zu (dadurch insgesamt 43,5% der Gesamtbevölkerung), die exklusionistisch und anti-elitär geneigte Grauzone um 1,9 Prozentpunkte (insgesamt 17,5%). Am deutlichsten verliert das Profil der anti-anti-elitären Minimalpragmatiker (-5,9%), wohingegen die Gruppe der anti-exklusionistischen Minimalpragmatiker fast gleich bleibt (-0,9%).
+
+Der Blick auf die so zum Vorschein gekommene Struktur latenter demokratischer Einstellungsprofile in Österreich lässt viele erste Beobachtungen zu. Zunächst ist festzuhalten, dass die Profillösung die für Österreich formulierte Erwartung einer besonderen Bedeutung der exklusionistischen Perspektive auf den ersten Blick bestätigt. Zwei Profile weisen positive exklusionistische Ausprägungen auf: Die »anti-elitären und exklusionistischen Minimalpragmatiker« sowie die »exklusionistisch und anti-elitär geneigte Grauzone« umfassen zusammengenommen mehr als die Hälfte der Bevölkerung. Dass die exklusionistische Orientierung sowohl in einem stark konturierten Profil als auch in einer Grauzone auftritt, legt nahe, dass sich hierin die Normalisierung exklusionistischer Politik im österreichischen Wahlkontext ausdrückt. Diese Perspektive auf Demokratie ist offenbar auch für einen weniger konsistent politisierten Teil der Bevölkerung anschlussfähig geworden. Mit anderen Worten: Man muss nicht anti-elitär eingestellt sein, um eine exklusionistische Perspektive auf Demokratie zu befürworten. Diese Interpretation schließt zudem an die Fallbeschreibung einer »radikalisierten Mitte« an, in deren Kontext die ÖVP unter Sebastian Kurz zentrale rhetorische und programmatische Elemente der FPÖ übernahm. Der Befund der Prävalenz der exklusionistischen Perspektive auf Demokratie in Österreich wäre demnach nicht ausschließlich auf die Stärke der FPÖ und ihrer Ideologie zurückzuführen, sondern ebenso auf die Diffusion dieser Perspektive in den politischen Mainstream.
+
+Die minimal-pragmatische Dimension verdient eine eigenständige Interpretation. Bereits im Vorfeld der Analyse war absehbar, dass die insgesamt breite Zustimmung zu der reduzierten Gestalt der pragmatischen Perspektive auf Demokratie, sich auch in der Strukturierung der Profile niederschlagen wird (siehe @sec-08-rq2). Drei der vier Profile weisen auf dieser Dimension hohe positive Mittelwerte auf. Eine klar ablehnende Gegenposition existiert hingegen nicht. Der entscheidende Konflikt der latenten demokratischen Einstellungsprofile in Österreich verläuft somit tendenziell innerhalb dieses breiten Lagers. Dieses differenziert sich danach aus, ob anti-elitäre und exklusionistische Einstellungen befürwortet, zurückgewiesen oder miteinander kombiniert werden. Damit erhält die minimal-pragmatische Perspektive im österreichischen Fall eine andere Bedeutung als die vollwertige pragmatische Perspektive auf Demokratie, wie wir sie in Deutschland und Griechenland identifiziert und in ihren unterschiedlichen Konfigurationen beschrieben haben. Die minimal-pragmatische Einstellung, die sich insbesondere durch ein Bekenntnis zu zwei zentralen Institutionen liberaler Demokratie auszeichnet – zu Wahlen und zur Macht der Exekutive –, ist offenbar mit sehr unterschiedlichen, darunter auch exklusionistischen Demokratievorstellungen vereinbar. Die paarweisen Vergleiche der Profile in allen zweidimensionalen Zusammenhangräumen zeigen nochmal eine anschauliche Visualisierung dieses Musters (siehe @fig-clpairs-aut).
+
+![LPA Verteilung der profilbezogenen Unsicherheiten in Österreich (2017)](../outputs/plots/tidylpa_scaled_midpoint/plots/AUT_2017/unweighted/uncertainty_AUT_2017.png){#fig-uncertainity-aut fig-align="center" width="100%"}
+
+@fig-clpairs-aut gibt zudem einen guten Überblick über die Bereiche, in denen sich die Profile deutlich voneinander unterscheiden beziehungsweise überlappen. Die Abbildung zeigt, dass die Profile – mit Ausnahme der Gruppe der anti-exklusionistischen Minimalpragmatiker – grundsätzlich gut voneinander zu trennen sind. Dieses Muster zeigt sich ebenfalls in @fig-uncertainity-aut, das die Klassifikationssicherheit der Profile anhand der Verteilung der Posteriorwahrscheinlichkeiten abbildet: Die Ausbuchtung der Verteilung im Bereich zwischen etwa 0,4 und 0,7 verdeutlicht, dass die Zuordnung einiger Personen mit Klassifikationsunsicherheiten behaftet ist und unterhalb der angestrebten Wahrscheinlichkeit von 0,8 liegt. In absteigender Reihenfolge, beginnend mit dem Profil der höchsten Klassifikationssicherheit, zeigt sich, dass die exklusionistisch und anti-elitär geneigte Grauzone mit einem Median von 0,99 eine außerordentlich eindeutige Zuordnung aufweist. Jeweils 94,5 Prozent der zugeordneten Personen überschreiten die Schwellenwerte von 0,70 und 0,80, was bedeutet, dass praktisch keine Fälle im Zwischenbereich liegen (@tbl-lpa-posterior-aut). Auch die anti-anti-elitären Minimalpragmatiker sowie die anti-elitären und exklusionistischen Minimalpragmatiker erreichen mit Medianwerten von 0,94 und einem Durchschnittswert von 0,88 eine hohe Klassifikationssicherheit. In diesem Profil erreichen 74,0 Prozent eine Zuordnungswahrscheinlichkeit von mindestens 0,70 und 62,6 Prozent von mindestens 0,80 (ibid.). Deutlich problematischer ist dagegen das kleine Profil der anti-exklusionistischen Minimalpragmatiker mit einem Median von lediglich 0,65. Dieses Profil sollte daher nicht mit derselben Sicherheit substanziell interpretiert werden wie die übrigen Gruppen. Nur 40,4 Prozent der zugeordneten Personen erreichen eine Posteriorwahrscheinlichkeit von mindestens 0,70 und lediglich 34,8 Prozent eine Wahrscheinlichkeit von mindestens 0,80 (ibid.). Seine geringe Prävalenz von 8,5 Prozent und die sichtbar breite Verteilung der maximalen Posteriorwahrscheinlichkeiten sprechen dafür, dass es sich um einen Übergangsbereich zwischen den größeren Profilen handeln könnte. Insgesamt verweist die Entropie der Profillösung mit einem Wert von 0,717 jedoch immer noch auf einen akzeptablen bis guten Wert[^6].
+
+[^6]: siehe @fig-entropie-aut für die Verteilung aller Personen in allen Profilen für einen Überblick zur Entropie des Gesamtmodells.
+
+```{r}
+#| label: tbl-lpa-posterior-aut
+#| tbl-cap: "Klassifikationsqualität der Drei-Profil-Lösung für Österreich 2017."
+#| echo: false
+
+lpa_posterior_table("AUT_2017")
+```
+
+Somit bleiben auch für Österreich wichtige Fragen offen, die sich mit Blick auf die latenten demokratischen Einstellungsprofile unweigerlich stellen und im letzten Analysekapitel dieser Arbeit beantwortet werden: Welche parteipolitischen Affinitäten weisen die exklusionistisch geprägten Profile im Kontext der »radikalisierten Mitte« des Jahres 2017 auf? Und spricht die Abwesenheit einer dominanten Grauzone bei gleichzeitiger Existenz zweier großer, einander entgegenstehender Gruppen generell für ein höheres Ausmaß an Polarisierung? Gibt es weitere Indizien dafür, dass wir es schließlich mit einer radikalisierten Form des populistischen Zeitgeists zu tun, wie es in @sec-07-aut bereits angedacht wurde?
+
+## Fallvergleichende Bewertung der Hypothesen
+
+Bevor die sich für alle Fälle aufdrängenden Fragen nach den politischen Implikationen der hier identifizierten Profile adressiert werden, gilt es zuerst den Hypothesen nachzugehen, die es erlauben, ein Résumé mit Blick auf die *Nuancierungsthese* zu bilden. Die Hypothesen postulierten besondere Nuancierungen einzelner Perspektiven auf Demokratie in den jeweiligen Fällen entsprechend einer most-likely-case Logik, die aus der Fallbeschreibung in @sec-04-vergleich hervorgegangen ist. Dabei lauteten die Hypothesen wie folgt:
+
+\vspace{0.8em}
+
+H2.1: *In Österreich treten Profile mit ausgeprägter exklusionistischer Orientierung deutlicher hervor als in Deutschland und Griechenland*
+
+\vspace{0.8em}
+
+H2.2: *In Griechenland treten Profile entlang populistischer und anti-populistischer Orientierung deutlicher hervor als in Deutschland und Österreich*
+
+\vspace{0.8em}
+
+H2.3: *In Deutschland treten pragmatische Profile deutlicher hervor als in Österreich und Griechenland.*
+
+\vspace{0.8em}
+
+H2.4: *In allen drei Fällen ist ein Grauzonen-Profil zu erwarten, das durch geringe oder nur schwach konturierte Ausprägungen der Demokratieperspektiven gekennzeichnet ist.*
+
+\vspace{0.8em}
+
+Ein vergleichender Blick hilft dabei, die Erkenntnisse zusammenzuführen, die für die Bewertung dieser Hypothesen erforderlich sind. Hierbei helfen zwei Heuristiken: @fig-profilmw-vgl setzt zunächst die Mittelwerte der identifizierten Profile in den drei Fällen unmittelbar zueinander in Beziehung. @tbl-dimension-metrics ergänzt diese grafische Übersicht um fünf Kennwerte, die eine komparative Bewertung der Hypothesen ermöglichen. Die *gewichtete Profildifferenz* erfasst, wie stark sich die Profile auf einer Dimension voneinander unterscheiden, wobei größere Profile stärker in die Berechnung eingehen als kleine Randprofile. Die *Zustimmungs- und Ablehnungsintensität* geben getrennt an, wie stark positive beziehungsweise negative Ausprägungen einer Perspektive in der Bevölkerung verbreitet sind. Der *Aktivierungswert* bildet ab, wie stark eine Dimension insgesamt ausgeprägt ist, unabhängig von der Richtung dieser Ausprägung. Die Kennwerte unterscheiden damit zwischen der profilbildenden Differenzierungswirkung einer Dimension und ihrer gesellschaftlichen Verbreitung[^7].
+
+[^7]: siehe @sec-robust-rq2-vgl für eine Übersicht der mathematischen Berechnungen der Metriken.
+
+![Vergleich der profilbezogenen Mittelwerte zwischen den Untersuchungsfällen](../outputs/plots/tidylpa_scaled_midpoint/cross_case_hypotheses/02_profile_means_point_line_comparison.png){#fig-profilmw-vgl fig-align="center" width="100%"}
+
+Hinsichtlich H2.1 lässt sich festhalten, dass die exklusionistische Perspektive in Österreich tatsächlich stärker nuanciert wird als in den anderen zwei Fällen. Die exklusionistische Dimension weist in Österreich eine gewichtete Profildifferenz von 0,47 auf. Damit differenziert sie die Profile stärker als in Deutschland mit 0,27 und Griechenland mit 0,13. Auch die Zustimmungsintensität ist in Österreich mit 0,20 höher als in Griechenland mit 0,12 und Deutschland mit 0,06. Eingeschränkt wird der Befund dadurch, dass die exklusionistische Dimension innerhalb Österreichs nicht die stärkste Differenzierungsdimension ist. Die anti-elitäre Dimension weist mit 0,59 größere Unterschiede zwischen den Profilen auf. Auch hinsichtlich der allgemeinen Aktivierung dominiert in Österreich deutlich die minimal-pragmatische Dimension. Eine präzise Beantwortung von H2.1 lautet dementsprechend: Die exklusionistische Perspektive ist in Österreich stärker positiv verbreitet und trägt stärker zur Differenzierung der Profile bei als in Deutschland und Griechenland. Innerhalb des österreichischen Falls stellt sie jedoch weder die am stärksten differenzierende noch die insgesamt am stärksten aktivierte Dimension dar.
+
+Mit Blick auf die Bewertung von H2.2 muss zunächst daran erinnert werden, dass die populistische Perspektive auf Demokratie in Österreich nicht vollständig validiert werden konnte; zum Vorschein kam lediglich der anti-elitäre Bestandteil des Populismus, was sich natürlich auch auf die Vergleichbarkeit der Fälle auswirkt. Unter Anbetracht dieser Klarstellung lässt sich folgendes zu H2.2 schreiben: Innerhalb Griechenlands ist die populistische Perspektive gesellschaftlich besonders stark verbreitet. Sie besitzt die höchste Zustimmungsintensität des Falls mit 0,38 und den höchsten Aktivierungswert mit 0,41. In diesem Sinne ist sie die in Griechenland am breitesten positiv verankerte Perspektive. Sie ist jedoch nicht die Dimension auf der sich die größten Unterschieden zwischen den Profilen bemerkbar machen. Die gewichtete Profildifferenz beträgt auf der populistischen Dimension 0,49, während die pragmatische Dimension mit 0,61 erheblich stärker differenziert. Auch der Vergleich zwischen den Fällen stützt H2.2 nicht vollständig, da die populistische beziehungsweise die anti-elitäre Dimension die Profile in Österreich mit 0,59 und in Deutschland mit 0,56 stärker differenziert als in Griechenland mit 0,49. Die Zustimmungsintensität ist in Griechenland dagegen mit großem Abstand am höchsten. Österreich erreicht auf der anti-elitären Dimension 0,22, Deutschland auf der populistischen Dimension lediglich 0,14. Damit lässt sich folgende Schlussfolgerung formulieren: H2.2 wird hinsichtlich der gesellschaftlichen Verbreitung der populistischen Perspektive bestätigt, nicht jedoch hinsichtlich ihrer Differenzierungskraft. Hier haben wir es mit zwei unterschiedlichen Dingen zu tun. Die populistische Orientierung ist in Griechenland besonders breit und deutlich positiv verankert, während die stärksten Unterschiede zwischen den Profilen aber auf der pragmatischen Dimension verlaufen.
+
+Mit Blick auf H2.3 und den Vergleich der pragmatischen Dimension ist ebenfalls zu konstatieren, dass der Vergleich zwischen allen Fällen nur eingeschränkt möglich ist, weil für den österreichischen Fall die vollwertige pragmatische Perspektive auf Demokratie nicht nachgewiesen werden konnte; stattdessen aber eine reduzierte Form, welche eine minimal-pragmatische Perspektive auf Demokratie ausdrückt. Diese ist, wie hinlänglich beschrieben in Österreich besonders stark im Bereich der Zustimmung ausgeprägt - die Mittelwerte aller Profile ausgenommen der Grauzone im östereichischen Fall übersteigen die maximalen Werte der Dimension sowohl in Griechenland als auch in Österreich. Vor dem Hintergrund des außergewöhnlich prävalenten minimalen Charakters der pragmatischen Dimension in Österreich lässt sich dennoch eine Bewertung von H2.3 treffen, die ja vordergründig auf Deutschland zielt: Innerhalb Deutschlands ist die pragmatische Dimension am stärksten verbreitet. Sie besitzt die höchste Zustimmungsintensität mit 0,29 und den höchsten Aktivierungswert mit 0,33. Jedoh erzeugt auch sie nicht die größten Unterschiede zwischen den Profilen. Die gewichtete Profildifferenz beträgt 0,47, während die populistische Dimension mit 0,56 stärker differenziert. Im Vergleich zwischen den Fällen fällt der Befund noch deutlicher gegen die Hypothese aus. Die pragmatische Dimension differenziert die Profile in Griechenland mit 0,61 stärker als in Deutschland mit 0,47. Die minimal-pragmatische Dimension in Österreich weist zwar eine etwas geringere Paardistanz von 0,43 auf, ist dort aber mit einer Zustimmungsintensität von 0,71 und einem Gesamtmittelwert von 0,68 erheblich breiter positiv verbreitet als die pragmatische Perspektive in Deutschland, was aber unter Vorbehalt der oben beschriebenen Einschränkungen zu verstehen ist. So bleibt insgesamt festzuhalten, dass die pragmatische Perspektive innerhalb Deutschlands die am breitesten positiv verankerte Dimension darstellt, aber auch, dass sie die Profile weniger stark als die populistische Dimension differenziert. Im Fallvergleich fällt zudem weder ihre Differenzierungswirkung noch ihre positive Verbreitung in Deutschland am stärksten aus, weshalb H2.3 abgelehnt werden muss.
+
+```{r}
+#| label: tbl-dimension-metrics
+#| tbl-cap: "Vergleichende Kennwerte der Demokratiedimensionen nach Fall"
+#| echo: false
+#| results: asis
+
+lpa_dimension_metrics_table()
+```
+
+Zuletzt gilt es H2.4 zu adressieren, die auf die Existenz und Ausprägung von Grauzonen gerichtet ist. Die Grauzonen-These wurde nicht formuliert, um ein Auffangbecken zu haben, in das die Personen zugeordnet werden, die eigentlich nicht zuzuordnen sind, sondern, weil es mehrere gute Gründe dafür gibt, anzunehmen, dass sich latente demokratische Einstellungsprofile eben in einem solchen Graubereich bewegen. Der theoretische Unterbau für diese Annahme lautete, dass es durchaus sein kann, dass Menschen keine besonders ausgeprägten Einstellungen zur Demokratie entwickeln. So wurden viele Forschungsarbeiten vorgestellt, die nachgewiesen haben, dass Menschen Demokratie zwar auf Nachfrage befürworten, dass sie aber indifferente oder gar gleichgültige Haltungen haben, sobald spezifischer gefragt wird, etwa wer das zentrale politische Subjekt sein sollte oder welcher demokratische Entscheidungsmechanismus vorzugswürdig wäre (siehe @sec-02-dem-pref und @sec-06-nuancT). Entsprechend zu solchen Erwartungen konnte auch in dieser Arbeit nachgewiesen werden, dass in zwei der drei Untersuchungsfällen ein Muster dominiert, das eine solche Form demokratischer Indifferenz ausdrückt. In Deutschland und Griechenland prägt die Grauzone die jeweilige Profilstruktur besonders stark: Ihr werden 50,7 beziehungsweise 65,2 Prozent der Befragten zugeordnet. Und auch in Österreich ist sie mit 15,6 Prozent ein relevantes Einstellungsprofil. Dabei weisen alle Grauzone jeweils unterschiedliche Neigungen auf und auch in der Intensität, in der diese Neigungen sichtbar werden, gibt es Unterschiede zwischen den Fällen. In Deutschland finden wir eine Grauzone mit pragmatischer Neigung, was insgesamt zum Muster der Wichtigkeit dieser Dimension im deutschen Fall passt. Analog dazu findet sich auch in Griechenland eine Grauzone mit populistischer Neigung und in Österreich eine mit exklusionistischer Neigung, ebenso wie einer Neigung zu einer anti-elitären Haltung. Es kann also konkludiert werden, dass durchaus ein Muster besteht, demnach die Grauzone eine Tendenz in die Richtung aufweist, die im Sinne der postulierten most-likely-case-Logik ohnehin nuanciert sein sollte - was auch als erster Indiz für die Stichhaltigkeit der entsprechenden *Nuancierungsthese* gelesen werden kann. Zugleich unterscheiden sich aber auch die Tendenzen, in welche die Grauzonen neigen, in ihrer Intensität: In Deutschland lässt sich vermutlich von einer Grauzone sprechen, die am nächsten an ein Verständnis von politischer Indifferenz oder Gleichgültigkeit anschließt. Die durchschnittliche Ausprägung der pragmatisch geneigten Grauzone in Deutschland beträgt gerade einmal 0,10 (die Skalen reichen auf jeder Dimension von -1 bis +1). In Griechenland ist die populistische Neigung der Grauzone deutlich stärker nuanciert. Bei einem Wert von 0,37 und ansonsten weitgehend mittigen Positionen auf den beiden anderen Dimensionen wäre es jedoch vermessen, von einem genuin latent populistischen Demokratieprofil zu sprechen. Dennoch wird hier deutlich, dass eine Affinität zur populistischen Perspektive auf Demokratie in einem Großteil der Bevölkerung (65,2%) vorzufinden war. Schließlich weist die exklusionistisch und anti-elitär geneigte Grauzone in Österreich, wie der Name bereits erkennen lässt, zwei Neigungen auf. Sie birgt darüber hinaus eine weitere Besonderheit, da sie sich gerade auf jener Dimension, auf der sie ihr größtes Maß an Indifferenz aufweist, grundlegend von allen anderen Profilen in Österreich unterscheidet, nämlich auf der minimal-pragmatischen Dimension. Insgesamt lässt sich schlussfolgern, dass die unterschiedlichen Einfärbungen der Grauzonen bereits Spuren der jeweils nuancierten politischen Konstellation tragen. Ihre Mitglieder vertreten keine geschlossene Demokratievorstellung, sind jedoch auch nicht voraussetzungslos offen, da bestimmte politische Deutungen bei ihnen bereits einen Anschlussvorteil besitzen. Grauzonen können insofern als jene Bereiche demokratischer Einstellungen verstanden werden, in denen das größte Transformationspotenzial liegt.
+
+Die *Nuancierungsthese* lautete, dass sich analog zu der besonderen Verbindung der Fälle zu den drei Perspektiven auf Demokratie auch eine entsprechende Struktur der latenten Einstellungsprofile nachweisen lassen sollte. In diesem prüfenden Sinne wurden die drei Fälle als »most-likely cases« dargestellt, in denen das Auftreten eines theoretisch erwarteten Befundes besonders wahrscheinlich ist (siehe @sec-06-nuancT). Die Ergebnisse zeigen, dass die populistische Perspektive in Griechenland, die pragmatische Perspektive in Deutschland und die exklusionistische Perspektive in Österreich jeweils eine wichtige Rolle für die allgemeine Struktur der identifizierten Profile spielen. Unter dem Vorbehalt dieses bestätigenden Befundes ist zudem festzuhalten, dass kein Profil identifiziert wurde, das sich primär durch die Zurückweisung einer der Perspektiven auf Demokratie auszeichnet. Am Ausgangspunkt jedes Profils steht stets ein positiver Bezug zu mindestens einer der drei Perspektiven auf Demokratie - dies gilt sogar für die jeweiligen Grauzonen. Die Gegenthese eines Nuancierungspotenzials, das von den negativen Polen ausgeht, kann daher zurückgewiesen werden. Mit Blick auf die Bestätigung der Nuancierungsthese, die sich damit vor allem durch Zustimmung auszeichnet, ist dennoch eine fallübergreifende Besonderheit hervorzuheben: Eine Perspektive kann gesellschaftlich besonders stark verbreitet sein, ohne die latenten demokratischen Einstellungsprofile zugleich besonders deutlich voneinander zu trennen. In Österreich trifft dies besonders auf die minimal-pragmatische Perspektive zu, in Griechenland auf die populistische und in Deutschland auf die pragmatische Perspektive. Die zentralen Konfliktlinien verlaufen teilweise auf anderen Dimensionen als die gesellschaftlich am stärksten verbreiteten Orientierungen. Ein besonders günstiger Kontext für eine Perspektive auf Demokratie führt nicht dazu, dass diese Perspektiven zwangsläufig konfliktreich umlämpft sind. Stattdessen lässt sich auf Grund der hier akkumulierten Befunde eher schlussfolgern, dass ein Kontext, der eine bestimmte Perspektive auf Demokratie positiv akzentuiert, dazu führen kann, dass eine Normalisierung der entsprechenden Perspektive in dem Sinne stattfindet, als dass ihr gruppenübergreifend tendenziell zugestimmt wird. Kontextuelle Salienz kann also auch Konsensbildung erzeugen, und muss nicht zwangsläufig in einer Polarisierungskonstellation münden.
+
+Die Frage, ob semantische Konflikte um Demokratie, wie sie auf der Ebene politischer Akteure geführt werden, in den gesellschaftlichen Bereich diffundieren, kann auf Basis des Untersuchungsdesigns nicht direkt beantwortet werden[^8]. Was sich jedoch zeigt, ist, dass sich Profile, die primär pragmatisch und populistisch geprägt sind, grundsätzlich konfliktreich gegenüberstehen. Dieser Konflikt lässt sich durchaus auch in allen drei Fällen in den jeweils stattfindenden politische Debatten wiederfinden. Dieser Konflikt wird jedoch aufgehoben, wenn die pragmatischen Dimension auf ein minimales Überbleibsel reduziert wird, das ausschließlich auf zwei Kernprinzipien der liberalen Demokratie verweist: die Wichtigkeit der Wahl und die Macht der Exekutive. In Österreich zeigt sich, dass die gebündelte Zustimmung zu diesen zwei Prinzipien der Demokratie mit ganz unterschiedlichen Elementen anderer Perspektiven auf Demokratie vereinbar ist. Es zeigt sich zudem auch, dass dort, wo eine der Perspektiven auf Demokratie im Wahlkontext salient ist, diese Perspektive auch einen besonderen Einfluss auf die Profilbildung ausübt. Dieser Einfluss drückt sich jedoch eher durch eine Zustimmung als durch eine Kontestation der Dimension aus. Dies lässt die Interpretation zu, dass es im semantischen Konflikt um Demokratie - wie @volkmann2025 ihn tituliert hat - Gewinner gibt, die dann Normen setzen. Diese können exklusionistisch, populistisch oder pragmatisch sein.
+
+[^8]: Das Untersuchungsdesign dieser Arbeit erlaubt es etwa nicht, eine kausale Aussage darüber zu treffen, ob mit der Intensität solcher Konflikte auch die gesellschaftliche Nachfrage nach den dabei ausgehandelten demokratischen Angeboten variiert.
+
+Ein letzter zentraler Befund dessen Rolle im Bereich der Erforschung demokratischer Einstellung nicht überschätzt werden kann und darf, betrifft die Vebreitung von Grauzonen. Sie umfassen große Teile der Bevölkerung, die keine eindeutig konturierten Demokratievorstellungen ausbilden. Zugleich weisen diese Einstellungsräume Tendenzen auf, die ebenfalls in die Richtungen der Perspektive auf Demokratie zeigen, die weit verbreitet, aber wenig umkämpft erscheinen. Sie bilden den zentralen gesellschaftlichen Bereich, in dem sich künftige Verschiebungen demokratischer Einstellungen vollziehen können.
+
+\clearpage
