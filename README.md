@@ -13,9 +13,9 @@ outputs/       # Generated outputs (kept out of version control by default)
 
 ## Recommended usage
 
-- Store each dissertation chapter as a separate `.qmd` file in `/home/runner/work/Dissertation_2026/Dissertation_2026/chapters`.
-- Save any dissertation CSS files in `/home/runner/work/Dissertation_2026/Dissertation_2026/assets/css`.
-- Save R scripts that generate tables, figures, or derived data in `/home/runner/work/Dissertation_2026/Dissertation_2026/scripts/R`.
-- Put generated outputs in `/home/runner/work/Dissertation_2026/Dissertation_2026/outputs`.
+- Store each dissertation chapter as a separate `.qmd` file in `chapters/`.
+- Save any dissertation CSS files in `assets/css/`.
+- Save R scripts that generate tables, figures, or derived data in `scripts/R/`.
+- Put generated outputs in `outputs/`.
 
 To help keep chapter drafts secure, keep the repository private for unpublished work and avoid committing rendered output files unless you explicitly want to publish them.
